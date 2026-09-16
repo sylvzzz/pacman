@@ -3,3 +3,7 @@
 ``pacman.core`` (Person A): rules, config, maze, entities -- no pygame.
 ``pacman.ui``   (Person B): window, drawing, screens, highscores, app loop.
 """
+
+from pacman import ui
+
+__all__ = ["ui"]

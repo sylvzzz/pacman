@@ -4,7 +4,8 @@ PY = $(VENV)/bin/python
 CONFIG ?= config.json
 # The assigned A-Maze-ing package (used as-is). Drop the wheel in vendor/
 # or override:  make install MAZEGEN=/path/to/other-package
-MAZEGEN ?= $(wildcard vendor/*.whl)
+
+# $(PY) pac-man.py $(CONFIG) --command for the finalized project
 
 MYPY_FLAGS = --warn-return-any --warn-unused-ignores --ignore-missing-imports \
 	--disallow-untyped-defs --check-untyped-defs
@@ -13,15 +14,11 @@ install:
 	$(PYTHON) -m venv $(VENV)
 	$(PY) -m pip install --upgrade pip
 	$(PY) -m pip install -r requirements.txt
-ifneq ($(strip $(MAZEGEN)),)
-	$(PY) -m pip install "$(MAZEGEN)"
-else
-	@echo ">> Now install the assigned A-Maze-ing package into $(VENV):"
-	@echo ">>   make install MAZEGEN=<path-or-name-of-the-package>"
-endif
+	$(PY) -m pip install mazegenerator-2.1.0-py3-none-any.whl
+
 
 run:
-	$(PY) pac-man.py $(CONFIG)
+	$(PY) pac-man.py
 
 debug:
 	$(PY) -m pdb pac-man.py $(CONFIG)
@@ -30,7 +27,6 @@ clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
 	find . -type d -name .mypy_cache -prune -exec rm -rf {} +
 	find . -type d -name .pytest_cache -prune -exec rm -rf {} +
-	find . -name "*.pyc" -delete
 	rm -rf build dist
 
 lint:

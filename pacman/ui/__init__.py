@@ -2,3 +2,7 @@
 
 Imports ``pacman.core``; only ``renderer`` and ``app`` may call pygame.
 """
+
+from pacman.ui.app import Screen
+
+__all__ = ["Screen"]

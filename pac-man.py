@@ -5,3 +5,14 @@ Planned contents: imports pacman.ui.app; parse_arguments() raising UsageError, m
 every PacManError into a message on stderr and an exit code
 (2 usage, 1 error, 130 keyboard interrupt). Never a traceback.
 """
+
+
+def main() -> None:
+    from pacman import ui
+
+    screen = ui.Screen(400, 500)
+    screen.run()
+
+
+if __name__ == "__main__":
+    main()
