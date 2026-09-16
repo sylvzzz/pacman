@@ -15,7 +15,7 @@ install:
 	$(PY) -m pip install --upgrade pip
 	$(PY) -m pip install -r requirements.txt
 	$(PY) -m pip install mazegenerator-2.1.0-py3-none-any.whl
-
+	$(PY) -m pip install ubuntu/mlx-2.2-py3-none-any.whl
 
 run:
 	$(PY) pac-man.py
