@@ -1,0 +1,31 @@
+pygame.draw.rect / circle / polygon / line / ellipse / arc — MLX não tem nenhuma função de formas. → Rasterizado à mão em Canvas (scanlines de píxeis).
+Surface.fill(cor, rect) (preencher só uma zona / outra cor) — mlx_clear_window só limpa a janela inteira a preto. → Canvas.rect.
+Texto
+
+pygame.font.Font / SysFont / match_font — MLX não carrega fontes.
+Font.render(texto, antialias, cor) — não existe "texto para imagem" nem anti-aliasing.
+Font.size(texto) — MLX não mede texto.
+→ Tudo substituído pelos glifos 5×7 de blockfont.py.
+Transparência / blending / transformação
+
+Surface.set_alpha, set_colorkey, convert_alpha, BLEND_* flags — mlx_pixel_put recebe RGB opaco, sem alpha.
+pygame.transform.scale / rotate / flip / smoothscale — MLX não escala nem roda imagens.
+→ Painéis opacos e glifos em várias escalas desenhados diretamente.
+Imagens / sprites
+
+pygame.image.load / save — a única entrada de imagem na MLX é mlx_xpm_file_to_image/mlx_png_file_to_image, que não usamos (e não há assets).
+pygame.sprite.*, Surface.subsurface, Surface.copy — sem equivalente.
+Surface.get_size, get_at, get_rect, map_rgb, unmap_rgb — MLX não lê a janela nem devolve metadados; sabes as dimensões porque as passaste tu.
+Tempo / loop
+
+pygame.time.Clock, Clock.tick, pygame.time.get_ticks / delay / wait / set_timer — MLX não tem relógio. → time.perf_counter / time.sleep da stdlib.
+Eventos / input
+
+event.unicode — mlx_key_hook só dá o keycode. → chr(key) em App.
+pygame.key.get_pressed, key.set_repeat, mouse.get_pos (temos mlx_mouse_get_pos mas não usamos rato), event.set_grab, joystick.* — sem equivalente ou não necessários.
+Vários
+
+pygame.Rect (e Rect.center, collidepoint, etc.) — estrutura auxiliar sem equivalente; substituído por aritmética simples.
+pygame.mixer.* / pygame.mixer.music — MLX não tem som (o subject também não pede).
+pygame.display.set_icon / toggle_fullscreen / set_mode com flags OPENGL/SCALED/RESIZABLE — mlx_new_window não tem opções.
+PixelArray.close() — MLX não tem "fechar buffer"; libertamos com del.
