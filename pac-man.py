@@ -10,8 +10,9 @@ every PacManError into a message on stderr and an exit code
 def main() -> None:
     from pacman import ui
 
-    screen = ui.Screen(400, 500)
+    screen = ui.Screen(1200, 720)
     screen.run()
+    
 
 
 if __name__ == "__main__":
