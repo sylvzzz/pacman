@@ -1,0 +1,5 @@
+PAC-MAN
+
+Run: ./pac-man config.json
+
+Controls, options and configuration: TODO

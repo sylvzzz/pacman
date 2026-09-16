@@ -1,0 +1,35 @@
+# Pac-Man configuration. Lines starting with # or // are comments.
+# Every key is optional: a missing key takes its default, an invalid value
+# is clamped or replaced with a warning, unknown keys are ignored.
+{
+    "highscore_filename": "highscores.json",
+    "lives": 3,
+    "points_per_pacgum": 10,
+    "points_per_super_pacgum": 50,
+    "points_per_ghost": 200,
+    "seed": 42,
+    "level_max_time": 90,
+    "frightened_time": 8.0,
+    "ghost_respawn_time": 5.0,
+    "ready_time": 1.5,
+    "player_speed": 5.0,
+    "ghost_speed": 4.0,
+    "pacgum_density": 90,
+    "cheats_enabled": true,
+    "window_width": 960,
+    "window_height": 720,
+    "fps": 60,
+    # Maze size of each level in cells (width x height). At least 10 levels.
+    "levels": [
+        {"width": 14, "height": 10},
+        {"width": 15, "height": 10},
+        {"width": 15, "height": 11},
+        {"width": 16, "height": 11},
+        {"width": 16, "height": 12},
+        {"width": 17, "height": 12},
+        {"width": 17, "height": 13},
+        {"width": 18, "height": 13},
+        {"width": 18, "height": 14},
+        {"width": 19, "height": 14}
+    ]
+}
