@@ -8,6 +8,24 @@ class Screen:
     def __init__(self, width: int, height: int) -> None:
         self.width = width
         self.height = height
+        self.mock_walls = {     # this is just for testing in the terminal, not final
+            0: "",
+            1: "╵",
+            2: "╶",
+            3: "└",
+            4: "╷",
+            5: "│",
+            6: "┌",
+            7: "├",
+            8: "╴",
+            9: "┘",
+            10: "─",
+            11: "┴",
+            12: "┐",
+            13: "┤",
+            14: "┬",
+            15: "┼",
+        }
 
     def run(self) -> None:
         from mazegenerator import MazeGenerator
@@ -24,4 +42,6 @@ class Screen:
         print(f"Shortest path length: {len(shortest_path)}")
         print("===== MAZE =====")
         for row in maze_grid:
-            print(row)
+            for item in row:
+                print(self.mock_walls[item], end="")
+            print()
