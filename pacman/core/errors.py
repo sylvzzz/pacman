@@ -1,8 +1,7 @@
 """Exception types raised by the Pac-Man package.
 
-Owner: Person A
-PacManError is the base of every error shown to the user; pac-man.py
-maps each subclass to an exit code (2 for usage, 1 for the others).
+Owner: Person A PacManError is the base of every error shown to the user; pac-
+man.py maps each subclass to an exit code (2 for usage, 1 for the others).
 """
 
 
