@@ -59,9 +59,9 @@ class Screen:
         # table of letter blocks, filled once
         self.chars = Character(" ").chars
 
-        self.menu_options = ["PAC-MAN", "View Highscores", "Instructions", "Exit"]
+        self.menu_options = ["View Highscores", "Instructions", "Exit"]
 
-    def write_char(self, char: str, screen, size: int, x: int, y: int) -> None:
+    def write_char(self, char: str, screen, size: int, x: int, y: int, color = (255, 255, 0)) -> None:
         block = self.chars.get(char, " ")
         for row, line in enumerate(block):
             for col, bit in enumerate(line):
@@ -69,18 +69,28 @@ class Screen:
                     for i in range(size):
                         for j in range(size):
                             screen.set_at((x + col * size + i, y + row * size + j),
-                                          self.colors["yellow"])
+                                          color)
 
-    def write(self, text: str, screen, x: int, y: int, size: int) -> None:
+    def write(self, text: str, screen, x: int, y: int, size: int, color = (255, 255, 0)) -> None:
         for ch in text:
-            self.write_char(ch, screen, size, x, y)
+            self.write_char(ch, screen, size, x, y, color)
             x += self.LETTER_W * size + 5
 
-    def draw_menu(self, screen) -> None:
+    def draw_menu(self, screen, selected = -1) -> None:
         start_y = (self.height - len(self.menu_options) * self.LINE_SPACING) // 2
+        yellow = self.colors["yellow"]
+
+        x = (self.width - len("PAC-MAN") * self.LETTER_W * self.TEXT_SIZE) // 2
+        self.write("PAC-MAN", screen, x, start_y - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
+
+        start_y += 30
+
         for i, text in enumerate(self.menu_options):
             x = (self.width - len(text) * self.LETTER_W * self.TEXT_SIZE) // 2
-            self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE)
+            if i == selected:
+                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["orange"])
+            else:
+                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
 
 
     def run(self) -> None:
@@ -98,7 +108,7 @@ class Screen:
         print(f"Maze dimensions: {len(maze_grid[0])}x{len(maze_grid)}")
         print(f"Entry: {maze_gen.maze_entry}, Exit: {maze_gen.maze_exit}")
         print(f"Shortest path length: {len(shortest_path)}")
-        print("===== MAZE =====")
+        print("====== MAZE ======")
         for row in maze_grid:
             for item in row:
                 print(self.mock_walls[item], end="")
@@ -107,19 +117,22 @@ class Screen:
         pygame.display.flip()
         menu_idx = 0
         running = True
-        self.draw_menu(screen)
+        self.draw_menu(screen, menu_idx)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
                         running = False
-                    elif event.key == pygame.K_UP:
-                        menu_idx += 1
                     elif event.key == pygame.K_DOWN:
+                        if menu_idx < len(self.menu_options) - 1:
+                            menu_idx += 1
+                            self.draw_menu(screen, menu_idx)
+                    elif event.key == pygame.K_UP:
                         if menu_idx > 0:
                             menu_idx -= 1
+                            self.draw_menu(screen, menu_idx)
 
             selected = menu_idx % len(self.menu_options)
-            print(selected)
+            print(self.menu_options[selected])
             pygame.display.flip()
             time.sleep(0.1)
