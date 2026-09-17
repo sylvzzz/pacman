@@ -4,6 +4,7 @@ Owner: Person B
 Planned contents: Canvas (pixel-buffer access, hand-rasterised rects/circles/text), Renderer (owns the window; draws menu, pages, maze image cached per level, entities, HUD, pause and end panels).
 """
 from pacman.ui.blockfont import Character
+from pacman.ui.log import Logger
 import pygame
 import os
 import time
@@ -39,6 +40,7 @@ class Screen:
             "orange":   (255, 165, 0),
             "purple":   (180, 50, 180),
             "black":    (0, 0, 0),
+            "white":    (255, 255, 255),
             "brown":    (139, 69, 19),   # rgb colors
             "maroon":   (128, 0, 0),
             "gold":     (255, 215, 0),
@@ -59,7 +61,7 @@ class Screen:
         # table of letter blocks, filled once
         self.chars = Character(" ").chars
 
-        self.menu_options = ["View Highscores", "Instructions", "Exit"]
+        self.menu_options = ["Play", "View Highscores", "Instructions", "Exit"]
 
     def write_char(self, char: str, screen, size: int, x: int, y: int, color = (255, 255, 0)) -> None:
         block = self.chars.get(char, " ")
@@ -95,6 +97,43 @@ class Screen:
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
 
+    def show_highscores(self, screen) -> None:
+        import json
+
+        try:
+            with open("players.json") as file:
+                    players = json.load(file)
+        except json.JSONDecodeError:
+            Logger.error("Invalid JSON in players data ...")
+            os._exit(1)
+        except FileNotFoundError as error:
+            Logger.error(f"File {error.filename} not found ...")
+            os._exit(1)
+
+        start_y = (self.height - len(self.menu_options) * self.LINE_SPACING) // 2
+        yellow = self.colors["yellow"]
+
+        x = (self.width - self.text_width("Top 10 Highest Scores", self.TEXT_SIZE + 2)) // 2
+        self.write("Top 10 Highest Scores", screen, x, start_y - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
+        
+        start_y += 30
+
+        players = sorted(players, key=lambda player: player['score'], reverse=True)
+        rank = 1
+        for player in players:
+            text = f'{rank}  -  {player["name"]}  -  {player["score"]}'
+            x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+            if rank > 3:
+                self.write(text, screen, x, start_y + rank * self.LINE_SPACING, self.TEXT_SIZE, yellow)
+            elif rank == 1:
+                self.write(text, screen, x, start_y + rank * self.LINE_SPACING, self.TEXT_SIZE, self.colors["gold"])
+            elif rank == 2:
+                self.write(text, screen, x, start_y + rank * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
+            elif rank == 3:
+                self.write(text, screen, x, start_y + rank * self.LINE_SPACING, self.TEXT_SIZE, self.colors["maroon"])
+            rank += 1
+
+        
 
     def run(self) -> None:
         from mazegenerator import MazeGenerator
@@ -123,6 +162,7 @@ class Screen:
         self.draw_menu(screen, menu_idx)
         while running:
             for event in pygame.event.get():
+                at_home_page = True
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
                         running = False
@@ -135,9 +175,17 @@ class Screen:
                             menu_idx -= 1
                             self.draw_menu(screen, menu_idx)
                     elif event.key == pygame.K_RETURN:
+                        current_page = self.menu_options[selected]
                         print(self.menu_options[selected])
                         if self.menu_options[selected] == "Exit":
                             running = False
+                        if self.menu_options[selected] == "View Highscores":
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.show_highscores(screen)
+                            at_home_page = False
+                    elif current_page != "Play" and at_home_page and event.key == pygame.K_LEFT:
+                        screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                        self.draw_menu(screen)
 
             selected = menu_idx % len(self.menu_options)
             pygame.display.flip()

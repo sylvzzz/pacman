@@ -5,5 +5,6 @@ Imports ``pacman.core``; only ``renderer`` and ``app`` may call pygame.
 
 from pacman.ui.renderer import Screen
 from pacman.ui.blockfont import Character
+from pacman.ui.log import Logger
 
-__all__ = ["Screen", "Character"]
+__all__ = ["Screen", "Character", "Logger"]
