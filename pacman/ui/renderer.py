@@ -129,18 +129,6 @@ class Screen:
 
         start_y += 30
 
-        box = (
-            "##############################",
-            "#                            #",
-            "#                            #",
-            "#                            #",
-            "##############################",
-        )
-
-        for i, text in enumerate(box):
-            x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
-            self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
-
         x = (self.width - self.text_width(name + "_", self.TEXT_SIZE)) // 2
         self.write(name + "_", screen, x, start_y + 2 * self.LINE_SPACING, self.TEXT_SIZE, self.colors["cyan"])
 
