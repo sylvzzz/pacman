@@ -157,7 +157,7 @@ class Screen:
         return [[Wall(w) for w in row] for row in raw_maze]
 
     def render_maze(self, screen, maze) -> None:
-        tile = 10
+        tile = 10  # size of a non empty character
         wall = self.colors["blue"]
         rows, cols = len(maze), len(maze[0])
         width, height = cols * 3 * tile, rows * 3 * tile
@@ -222,6 +222,7 @@ class Screen:
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.play(screen)
                             at_home_page = False
+                            playing = True
                         if self.menu_options[selected] == "View Highscores":
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.show_highscores(screen)
@@ -233,6 +234,11 @@ class Screen:
                     elif current_page != "Play" and at_home_page and event.key == pygame.K_LEFT:
                         screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                         self.show_menu(screen)
+                    elif playing is True and event.key == pygame.K_r:
+                        screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                        self.play(screen)
+                        at_home_page = False
+                        playing = True
 
             selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
