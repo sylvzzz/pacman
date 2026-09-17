@@ -7,3 +7,6 @@ class Logger:
 
     def warning(text: str) -> None:
             print("\033[33m" + text + "\033[0m")
+
+    def log(text: str) -> None:
+        print(text)

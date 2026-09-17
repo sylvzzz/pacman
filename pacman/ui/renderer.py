@@ -222,12 +222,13 @@ class Screen:
                             menu_idx -= 1
                             self.show_menu(screen, menu_idx)
                     elif event.key == pygame.K_RETURN:
-                        print(self.menu_options[selected])
+                        Logger.log(self.menu_options[selected])
                         if self.menu_options[selected] == "Exit":
                             running = False
                         if self.menu_options[selected] == "Play":
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.play(screen, maze_gen)
+                            self.move_player(maze_gen.maze, screen, player_x, player_y)
                             at_home_page = False
                             playing = True
                         if self.menu_options[selected] == "View Highscores":
@@ -243,35 +244,35 @@ class Screen:
                         self.show_menu(screen)
                     elif playing is True:
                         if event.key == pygame.K_r:
-                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            screen.fill((0, 0, 0))
                             maze_gen.generate()
                             self.play(screen, maze_gen)
-                            at_home_page = False
                             playing = True
-                        if event.key == pygame.K_UP:
-                            if player_y > 0:
-                                screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                                self.play(screen, maze_gen)
-                                self.move_player(maze_gen.maze,screen, player_x, player_y)
-                                player_y -= 1
-                        if event.key == pygame.K_DOWN:
-                            if player_y < len(maze_gen.maze) - 1:
-                                screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                                self.play(screen, maze_gen)
-                                player_y += 1
-                                self.move_player(maze_gen.maze,screen, player_x, player_y)
-                        if event.key == pygame.K_LEFT:
-                            if player_x > 0:
-                                screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                                self.play(screen, maze_gen)
-                                self.move_player(maze_gen.maze,screen, player_x, player_y)
-                                player_x -= 1
-                        if event.key == pygame.K_RIGHT:
-                            if player_x < len(maze_gen.maze[0]) - 1:
-                                screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                                self.play(screen, maze_gen)
-                                player_x += 1
-                                self.move_player(maze_gen.maze,screen, player_x, player_y)
+
+                        if event.key == pygame.K_UP and player_y > 0:
+                            player_y -= 1
+                            screen.fill((0, 0, 0))
+                            self.play(screen, maze_gen)
+                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+
+                        if event.key == pygame.K_DOWN and player_y < len(maze_gen.maze) - 1:
+                            player_y += 1
+                            screen.fill((0, 0, 0))
+                            self.play(screen, maze_gen)
+                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+
+                        if event.key == pygame.K_LEFT and player_x > 0:
+                            player_x -= 1
+                            screen.fill((0, 0, 0))
+                            self.play(screen, maze_gen)
+                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+
+                        if event.key == pygame.K_RIGHT and player_x < len(maze_gen.maze[0]) - 1:
+                            player_x += 1
+                            screen.fill((0, 0, 0))
+                            self.play(screen, maze_gen)
+                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+
                         Logger.success(f"X: {player_x}, Y: {player_y}")
 
             selected = menu_idx % len(self.menu_options)
