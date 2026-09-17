@@ -5,6 +5,7 @@ Planned contents: Canvas (pixel-buffer access, hand-rasterised rects/circles/tex
 """
 from pacman.ui.blockfont import Character
 from pacman.ui.log import Logger
+from pacman.ui.maze import Wall
 import pygame
 import os
 import time
@@ -96,7 +97,7 @@ class Screen:
         for i, text in enumerate(self.menu_options):
             x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if i == selected:
-                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["orange"])
+                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
 
@@ -152,29 +153,48 @@ class Screen:
                 self.write(text, screen, x, start_y + rank * self.LINE_SPACING, self.TEXT_SIZE, self.colors["maroon"])
             rank += 1
 
-        
+    def code_to_walls(self, raw_maze: list) -> list:
+        return [[Wall(w) for w in row] for row in raw_maze]
 
-    def run(self) -> None:
+    def render_maze(self, screen, maze) -> None:
+        tile = 10
+        wall = self.colors["blue"]
+        rows, cols = len(maze), len(maze[0])
+        width, height = cols * 3 * tile, rows * 3 * tile
+        ox = (self.width - width) // 2
+        oy = (self.height - height) // 2
+
+        for cy, row in enumerate(maze):
+            for cx, w in enumerate(row):
+                for i, line in enumerate(w.wall):
+                    for j, ch in enumerate(line):
+                        if ch != " ":
+                            screen.fill(wall, (ox + (cx * 3 + j) * tile,
+                                               oy + (cy * 3 + i) * tile,
+                                               tile, tile))
+
+    def play(self, screen) -> None:
         from mazegenerator import MazeGenerator
 
-        pygame.init()
-        screen = pygame.display.set_mode((self.width, self.height))
         # Create a simple 20x20 maze
         maze_gen = MazeGenerator((20, 20))
-
+        
         # Get the maze structure
         maze_grid = maze_gen.maze
         shortest_path = maze_gen.shortest_path
-
+        
         print(f"Maze dimensions: {len(maze_grid[0])}x{len(maze_grid)}")
         print(f"Entry: {maze_gen.maze_entry}, Exit: {maze_gen.maze_exit}")
         print(f"Shortest path length: {len(shortest_path)}")
-        print("====== MAZE ======")
-        for row in maze_grid:
-            for item in row:
-                print(self.mock_walls[item], end="")
-            print()
 
+        self.render_maze(screen, self.code_to_walls(maze_grid))
+        
+
+    def run(self) -> None:
+
+        pygame.init()
+        screen = pygame.display.set_mode((self.width, self.height))
+        
         pygame.display.flip()
         menu_idx = 0
         running = True
@@ -198,6 +218,10 @@ class Screen:
                         print(self.menu_options[selected])
                         if self.menu_options[selected] == "Exit":
                             running = False
+                        if self.menu_options[selected] == "Play":
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.play(screen)
+                            at_home_page = False
                         if self.menu_options[selected] == "View Highscores":
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.show_highscores(screen)
