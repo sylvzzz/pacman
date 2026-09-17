@@ -71,6 +71,9 @@ class Screen:
                             screen.set_at((x + col * size + i, y + row * size + j),
                                           color)
 
+    def text_width(self, text: str, size: int) -> int:
+        return len(text) * self.LETTER_W * size + (len(text) - 1) * 5
+
     def write(self, text: str, screen, x: int, y: int, size: int, color = (255, 255, 0)) -> None:
         for ch in text:
             self.write_char(ch, screen, size, x, y, color)
@@ -80,13 +83,13 @@ class Screen:
         start_y = (self.height - len(self.menu_options) * self.LINE_SPACING) // 2
         yellow = self.colors["yellow"]
 
-        x = (self.width - len("PAC-MAN") * self.LETTER_W * self.TEXT_SIZE) // 2
+        x = (self.width - self.text_width("PAC-MAN", self.TEXT_SIZE + 2)) // 2
         self.write("PAC-MAN", screen, x, start_y - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
 
         start_y += 30
 
         for i, text in enumerate(self.menu_options):
-            x = (self.width - len(text) * self.LETTER_W * self.TEXT_SIZE) // 2
+            x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if i == selected:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["orange"])
             else:
@@ -132,10 +135,10 @@ class Screen:
                             menu_idx -= 1
                             self.draw_menu(screen, menu_idx)
                     elif event.key == pygame.K_RETURN:
+                        print(self.menu_options[selected])
                         if self.menu_options[selected] == "Exit":
                             running = False
 
             selected = menu_idx % len(self.menu_options)
-            print(self.menu_options[selected])
             pygame.display.flip()
             time.sleep(0.1)
