@@ -1,9 +1,10 @@
 Welcome to Pac-Man
 Built by dbotelho and dbaltaza at 42 Lisbon
 
-
-========= MENU =======
-
+======== MENU =======
 Enter - select menu option
 Arrow Up/Down - Move between options
 Arrow Left - Go back
+
+======== GAME =======
+Arrow Up/Down/Left/Right - Movement
