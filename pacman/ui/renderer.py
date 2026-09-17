@@ -172,7 +172,7 @@ class Screen:
         ox = (self.width - cols * 3 * tile) // 2
         oy = (self.height - rows * 3 * tile) // 2
 
-        size = 5
+        size = 3
         x, y = self.cell_to_pixel(to_x, to_y, ox, oy, tile, size)
         player.draw(screen, x, y, size)
         
@@ -272,6 +272,7 @@ class Screen:
                                 self.play(screen, maze_gen)
                                 player_x += 1
                                 self.move_player(maze_gen.maze,screen, player_x, player_y)
+                        Logger.success(f"X: {player_x}, Y: {player_y}")
 
             selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
