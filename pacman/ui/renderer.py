@@ -8,6 +8,14 @@ import pygame
 import os
 import time
 
+LETTER_W = 5
+LETTER_H = 7
+TEXT_SIZE = 4
+LINE_SPACING = 56
+
+# table of letter blocks, filled once
+chars = Character(" ").chars
+
 
 class Screen:
     def __init__(self, width: int, height: int) -> None:
@@ -59,21 +67,27 @@ class Screen:
     def on_close(self, param):
         os._exit(0)
 
-    def write_char(self, char: str, screen, size, x, y) -> None:
-        for row, line in enumerate(Character(char).bits):
+    def write_char(self, char: str, screen, size: int, x: int, y: int) -> None:
+        block = chars.get(char, chars[" "])
+        for row, line in enumerate(block):
             for col, bit in enumerate(line):
                 if bit == "#":
                     for i in range(size):
                         for j in range(size):
-                            screen.set_at((x + col*size + i, y + row*size + j), self.colors["yellow"])
+                            screen.set_at((x + col * size + i, y + row * size + j),
+                                          self.colors["yellow"])
 
-    def write(self, text, screen) -> None:
-        size = 5
-        x = (self.width - len(text) * 5 * size) // 2
-        y = (self.height - 7 * size) // 2
+    def write(self, text: str, screen, x: int, y: int, size: int) -> None:
         for ch in text:
-            self.write_char(ch, screen, 5, x, y)
-            x += 50
+            self.write_char(ch, screen, size, x, y)
+            x += LETTER_W * size + 5
+
+    def draw_menu(self, screen) -> None:
+        texts = ["PAC-MAN", "View Highscores", "Instructions", "Exit"]
+        start_y = (self.height - len(texts) * LINE_SPACING) // 2
+        for i, text in enumerate(texts):
+            x = (self.width - len(text) * LETTER_W * TEXT_SIZE) // 2
+            self.write(text, screen, x, start_y + i * LINE_SPACING, TEXT_SIZE)
 
     def run(self) -> None:
         from mazegenerator import MazeGenerator
@@ -98,10 +112,11 @@ class Screen:
 
         pygame.display.flip()
         running = True
+        self.draw_menu(screen)
         while running:
-            self.write("PAC-MAN", screen)
             for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
-                    running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_q:
+                        running = False
             pygame.display.flip()
             time.sleep(0.1)
