@@ -7,5 +7,6 @@ from pacman.ui.renderer import Screen
 from pacman.ui.blockfont import Character
 from pacman.ui.log import Logger
 from pacman.ui.maze import Wall
+from pacman.ui.figures import CreatureType, Creature
 
-__all__ = ["Screen", "Character", "Logger", "Wall"]
+__all__ = ["Screen", "Character", "Logger", "Wall", "CreatureType", "Creature"]

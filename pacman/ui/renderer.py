@@ -6,9 +6,11 @@ Planned contents: Canvas (pixel-buffer access, hand-rasterised rects/circles/tex
 from pacman.ui.blockfont import Character
 from pacman.ui.log import Logger
 from pacman.ui.maze import Wall
+from pacman.ui.figures import CreatureType, Creature
 import pygame
 import os
 import time
+
 
 
 class Screen:
@@ -173,24 +175,46 @@ class Screen:
                                                oy + (cy * 3 + i) * tile,
                                                tile, tile))
 
-    def play(self, screen) -> None:
-        from mazegenerator import MazeGenerator
+    def cell_to_pixel(self, cx: int, cy: int, ox: int, oy: int, tile: int,
+                      size: int) -> tuple:
+        sprite = 7 * size
+        return (ox + cx * 3 * tile + (3 * tile - sprite) // 2,
+                oy + cy * 3 * tile + (3 * tile - sprite) // 2)
 
-        # Create a simple 20x20 maze
-        maze_gen = MazeGenerator((20, 20))
+    def move_player(self, maze_grid, screen, entry_x, entry_y) -> None:
+        player = Creature(CreatureType.PLAYER, self.colors["yellow"])
         
+        tile = 10
+        rows, cols = len(maze_grid), len(maze_grid[0])
+        ox = (self.width - cols * 3 * tile) // 2
+        oy = (self.height - rows * 3 * tile) // 2
+
+        size = 2
+        x, y = self.cell_to_pixel(entry_x, entry_y, ox, oy, tile, size)
+        player.draw(screen, x, y, size)
+        
+
+    def play(self, screen, maze_gen) -> None:
+
         # Get the maze structure
         maze_grid = maze_gen.maze
         shortest_path = maze_gen.shortest_path
         
-        print(f"Maze dimensions: {len(maze_grid[0])}x{len(maze_grid)}")
-        print(f"Entry: {maze_gen.maze_entry}, Exit: {maze_gen.maze_exit}")
-        print(f"Shortest path length: {len(shortest_path)}")
+        # print(f"Maze dimensions: {len(maze_grid[0])}x{len(maze_grid)}")
+        # print(f"Shortest path length: {len(shortest_path)}")
 
         self.render_maze(screen, self.code_to_walls(maze_grid))
         
+        
 
     def run(self) -> None:
+        from mazegenerator import MazeGenerator
+
+        # Create a simple 20x20 maze
+        maze_gen = MazeGenerator((20, 20))
+        maze_gen.generate()
+        player_x = maze_gen.maze_entry[0]
+        player_y = maze_gen.maze_entry[1]
 
         pygame.init()
         screen = pygame.display.set_mode((self.width, self.height))
@@ -199,17 +223,18 @@ class Screen:
         menu_idx = 0
         running = True
         self.show_menu(screen, menu_idx)
+        playing = False
         while running:
             for event in pygame.event.get():
                 at_home_page = True
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
                         running = False
-                    elif event.key == pygame.K_DOWN:
+                    elif event.key == pygame.K_DOWN and not playing:
                         if menu_idx < len(self.menu_options) - 1:
                             menu_idx += 1
                             self.show_menu(screen, menu_idx)
-                    elif event.key == pygame.K_UP:
+                    elif event.key == pygame.K_UP and not playing:
                         if menu_idx > 0:
                             menu_idx -= 1
                             self.show_menu(screen, menu_idx)
@@ -220,7 +245,7 @@ class Screen:
                             running = False
                         if self.menu_options[selected] == "Play":
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                            self.play(screen)
+                            self.play(screen, maze_gen)
                             at_home_page = False
                             playing = True
                         if self.menu_options[selected] == "View Highscores":
@@ -234,11 +259,32 @@ class Screen:
                     elif current_page != "Play" and at_home_page and event.key == pygame.K_LEFT:
                         screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                         self.show_menu(screen)
-                    elif playing is True and event.key == pygame.K_r:
-                        screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                        self.play(screen)
-                        at_home_page = False
-                        playing = True
+                    elif playing is True:
+                        if event.key == pygame.K_r:
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.play(screen)
+                            at_home_page = False
+                            playing = True
+                        if event.key == pygame.K_UP:
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.play(screen, maze_gen)
+                            self.move_player(maze_gen.maze,screen, player_x, player_y)
+                            player_y -= 1
+                        if event.key == pygame.K_DOWN:
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.play(screen, maze_gen)
+                            player_y += 1
+                            self.move_player(maze_gen.maze,screen, player_x, player_y)
+                        if event.key == pygame.K_LEFT:
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.play(screen, maze_gen)
+                            self.move_player(maze_gen.maze,screen, player_x, player_y)
+                            player_x -= 1
+                        if event.key == pygame.K_RIGHT:
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.play(screen, maze_gen)
+                            player_x += 1
+                            self.move_player(maze_gen.maze,screen, player_x, player_y)
 
             selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
