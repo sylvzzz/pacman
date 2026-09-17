@@ -76,17 +76,20 @@ class Screen:
     def text_width(self, text: str, size: int) -> int:
         return len(text) * self.LETTER_W * size + (len(text) - 1) * 5
 
+    def text_height(self, texts: list[str], size: int) -> int:
+        return (len(texts) - 1) * self.LINE_SPACING + self.LETTER_H * size
+
     def write(self, text: str, screen, x: int, y: int, size: int, color = (255, 255, 0)) -> None:
         for ch in text:
             self.write_char(ch, screen, size, x, y, color)
             x += self.LETTER_W * size + 5
 
-    def draw_menu(self, screen, selected = -1) -> None:
-        start_y = (self.height - len(self.menu_options) * self.LINE_SPACING) // 2
+    def show_menu(self, screen, selected = -1) -> None:
+        start_y = (self.height - self.text_height(self.menu_options, self.TEXT_SIZE)) // 2
         yellow = self.colors["yellow"]
 
         x = (self.width - self.text_width("PAC-MAN", self.TEXT_SIZE + 2)) // 2
-        self.write("PAC-MAN", screen, x, start_y - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
+        self.write("PAC-MAN", screen, x, start_y - 20 - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
 
         start_y += 30
 
@@ -96,6 +99,22 @@ class Screen:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["orange"])
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
+
+    def show_instructions(self, screen) -> None:
+        lines = []
+        try:
+            with open("instructions.txt") as file:
+                for line in file:
+                    lines.append(line.strip())
+        except FileNotFoundError as error:
+                Logger.error(f"File {error.filename} not found ...")
+                os._exit(1)
+
+        start_y = (self.height - self.text_height(lines, self.TEXT_SIZE)) // 2
+
+        for i, line in enumerate(lines):
+            x = (self.width - self.text_width(line, self.TEXT_SIZE)) // 2
+            self.write(line, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
 
     def show_highscores(self, screen) -> None:
         import json
@@ -110,7 +129,7 @@ class Screen:
             Logger.error(f"File {error.filename} not found ...")
             os._exit(1)
 
-        start_y = (self.height - len(self.menu_options) * self.LINE_SPACING) // 2
+        start_y = (self.height - self.text_height(players, self.TEXT_SIZE)) // 2
         yellow = self.colors["yellow"]
 
         x = (self.width - self.text_width("Top 10 Highest Scores", self.TEXT_SIZE + 2)) // 2
@@ -159,7 +178,7 @@ class Screen:
         pygame.display.flip()
         menu_idx = 0
         running = True
-        self.draw_menu(screen, menu_idx)
+        self.show_menu(screen, menu_idx)
         while running:
             for event in pygame.event.get():
                 at_home_page = True
@@ -169,11 +188,11 @@ class Screen:
                     elif event.key == pygame.K_DOWN:
                         if menu_idx < len(self.menu_options) - 1:
                             menu_idx += 1
-                            self.draw_menu(screen, menu_idx)
+                            self.show_menu(screen, menu_idx)
                     elif event.key == pygame.K_UP:
                         if menu_idx > 0:
                             menu_idx -= 1
-                            self.draw_menu(screen, menu_idx)
+                            self.show_menu(screen, menu_idx)
                     elif event.key == pygame.K_RETURN:
                         current_page = self.menu_options[selected]
                         print(self.menu_options[selected])
@@ -183,9 +202,13 @@ class Screen:
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.show_highscores(screen)
                             at_home_page = False
+                        if self.menu_options[selected] == "Instructions":
+                            screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
+                            self.show_instructions(screen)
+                            at_home_page = False
                     elif current_page != "Play" and at_home_page and event.key == pygame.K_LEFT:
                         screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                        self.draw_menu(screen)
+                        self.show_menu(screen)
 
             selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
