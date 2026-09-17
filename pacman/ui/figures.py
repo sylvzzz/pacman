@@ -32,13 +32,13 @@ class Creature:
                 ".#####.",
             ),
             CreatureType.ENEMY: (
+                "..####..",
                 ".######.",
-                "#0%0#0%0",
-                "#0%0#0%0",
-                "#000#000",
-                "###..###",
-                "#.###.##",
-                ".##..##.",
+                "##00##00qqqq",
+                "##0%##0%",
+                "########",
+                "########",
+                "##.##.##.",
             ),
             CreatureType.SMALL_GUM: (
                 "..#..",
@@ -61,7 +61,7 @@ class Creature:
 
     def draw(self, screen, x: int, y: int, size: int) -> None:
         eye_white = (255, 255, 255)
-        eye_pupil = (0, 0, 0)
+        eye_pupil = (50, 100, 255)
         for row, line in enumerate(self.bits):
             for col, bit in enumerate(line):
                 if bit == "#":

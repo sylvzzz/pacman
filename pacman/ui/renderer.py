@@ -17,24 +17,6 @@ class Screen:
     def __init__(self, width: int, height: int) -> None:
         self.width = width
         self.height = height
-        self.mock_walls = {     # this is just for testing in the terminal, not final
-            0: "",
-            1: "╵",
-            2: "╶",
-            3: "└",
-            4: "╷",
-            5: "│",
-            6: "┌",
-            7: "├",
-            8: "╴",
-            9: "┘",
-            10: "─",
-            11: "┴",
-            12: "┐",
-            13: "┤",
-            14: "┬",
-            15: "┼",
-        }
         # pacman colors for easier access
         self.colors = {
             "green":    (50, 200, 50),
@@ -180,16 +162,17 @@ class Screen:
         sprite = 7 * size
         return (ox + cx * 3 * tile + (3 * tile - sprite) // 2,
                 oy + cy * 3 * tile + (3 * tile - sprite) // 2)
+    
 
     def move_player(self, maze_grid, screen, entry_x, entry_y) -> None:
-        player = Creature(CreatureType.PLAYER, self.colors["yellow"])
+        player = Creature(CreatureType.ENEMY, self.colors["red"])
         
         tile = 10
         rows, cols = len(maze_grid), len(maze_grid[0])
         ox = (self.width - cols * 3 * tile) // 2
         oy = (self.height - rows * 3 * tile) // 2
 
-        size = 2
+        size = 5
         x, y = self.cell_to_pixel(entry_x, entry_y, ox, oy, tile, size)
         player.draw(screen, x, y, size)
         
