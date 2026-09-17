@@ -8,14 +8,6 @@ import pygame
 import os
 import time
 
-LETTER_W = 5
-LETTER_H = 7
-TEXT_SIZE = 4
-LINE_SPACING = 56
-
-# table of letter blocks, filled once
-chars = Character(" ").chars
-
 
 class Screen:
     def __init__(self, width: int, height: int) -> None:
@@ -59,16 +51,18 @@ class Screen:
             "lime":  (80, 252, 7),
         }
 
-    def on_key(self, key, param) -> None:
-        # ESC
-        if key == 65307:
-            os._exit(0)
+        self.LETTER_W = 5
+        self.LETTER_H = 7
+        self.TEXT_SIZE = 4
+        self.LINE_SPACING = 56
 
-    def on_close(self, param):
-        os._exit(0)
+        # table of letter blocks, filled once
+        self.chars = Character(" ").chars
+
+        self.menu_options = ["PAC-MAN", "View Highscores", "Instructions", "Exit"]
 
     def write_char(self, char: str, screen, size: int, x: int, y: int) -> None:
-        block = chars.get(char, chars[" "])
+        block = self.chars.get(char, " ")
         for row, line in enumerate(block):
             for col, bit in enumerate(line):
                 if bit == "#":
@@ -80,14 +74,14 @@ class Screen:
     def write(self, text: str, screen, x: int, y: int, size: int) -> None:
         for ch in text:
             self.write_char(ch, screen, size, x, y)
-            x += LETTER_W * size + 5
+            x += self.LETTER_W * size + 5
 
     def draw_menu(self, screen) -> None:
-        texts = ["PAC-MAN", "View Highscores", "Instructions", "Exit"]
-        start_y = (self.height - len(texts) * LINE_SPACING) // 2
-        for i, text in enumerate(texts):
-            x = (self.width - len(text) * LETTER_W * TEXT_SIZE) // 2
-            self.write(text, screen, x, start_y + i * LINE_SPACING, TEXT_SIZE)
+        start_y = (self.height - len(self.menu_options) * self.LINE_SPACING) // 2
+        for i, text in enumerate(self.menu_options):
+            x = (self.width - len(text) * self.LETTER_W * self.TEXT_SIZE) // 2
+            self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE)
+
 
     def run(self) -> None:
         from mazegenerator import MazeGenerator
@@ -111,6 +105,7 @@ class Screen:
             print()
 
         pygame.display.flip()
+        menu_idx = 0
         running = True
         self.draw_menu(screen)
         while running:
@@ -118,5 +113,13 @@ class Screen:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
                         running = False
+                    elif event.key == pygame.K_UP:
+                        menu_idx += 1
+                    elif event.key == pygame.K_DOWN:
+                        if menu_idx > 0:
+                            menu_idx -= 1
+
+            selected = menu_idx % len(self.menu_options)
+            print(selected)
             pygame.display.flip()
             time.sleep(0.1)
