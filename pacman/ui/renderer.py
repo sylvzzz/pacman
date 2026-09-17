@@ -222,7 +222,6 @@ class Screen:
                             menu_idx -= 1
                             self.show_menu(screen, menu_idx)
                     elif event.key == pygame.K_RETURN:
-                        current_page = self.menu_options[selected]
                         print(self.menu_options[selected])
                         if self.menu_options[selected] == "Exit":
                             running = False
@@ -239,13 +238,14 @@ class Screen:
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.show_instructions(screen)
                             at_home_page = False
-                    elif current_page != "Play" and at_home_page and event.key == pygame.K_LEFT:
+                    elif not playing and at_home_page and event.key == pygame.K_LEFT:
                         screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                         self.show_menu(screen)
                     elif playing is True:
                         if event.key == pygame.K_r:
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
-                            self.play(screen)
+                            maze_gen.generate()
+                            self.play(screen, maze_gen)
                             at_home_page = False
                             playing = True
                         if event.key == pygame.K_UP:
