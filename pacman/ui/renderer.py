@@ -131,6 +131,9 @@ class Screen:
                         if menu_idx > 0:
                             menu_idx -= 1
                             self.draw_menu(screen, menu_idx)
+                    elif event.key == pygame.K_RETURN:
+                        if self.menu_options[selected] == "Exit":
+                            running = False
 
             selected = menu_idx % len(self.menu_options)
             print(self.menu_options[selected])
