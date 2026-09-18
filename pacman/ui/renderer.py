@@ -258,8 +258,22 @@ class Screen:
         # print(f"Shortest path length: {len(shortest_path)}")
 
         self.render_maze(screen, self.code_to_walls(maze_grid))
-        
-        
+
+    def save_player(self, name: str, points: int) -> None:
+        import json
+
+        try:
+            with open("players.json", "r") as file:
+                players = json.load(file)
+                players.append({"name": name, "score": points})
+            with open("players.json", "w") as file:
+                json.dump(players, file, indent=2)
+        except json.JSONDecodeError:
+            Logger.error("Invalid JSON in players data ...")
+            os._exit(1)
+        except FileNotFoundError as error:
+            Logger.error(f"File {error.filename} not found ...")
+            os._exit(1)
 
     def run(self) -> None:
         from mazegenerator import MazeGenerator
@@ -279,6 +293,7 @@ class Screen:
         self.show_menu(screen, menu_idx)
         playing = False
         reading_name = False
+        points = 0
         while running:
             for event in pygame.event.get():
                 at_home_page = True
@@ -291,6 +306,7 @@ class Screen:
                             reading_name = False
                         if event.key == pygame.K_RETURN:
                             if self.valid_name(name):
+                                self.save_player(name, points)
                                 screen.fill((0, 0, 0))
                                 self.play(screen, maze_gen)
                                 self.move_player(maze_gen.maze, screen, player_x, player_y)
