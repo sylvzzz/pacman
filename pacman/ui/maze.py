@@ -34,7 +34,7 @@ class Wall:
 
     def south_open(self) -> bool:
             number = format(self.code, '04b')
-            if str(number)[3] == "1":
+            if str(number)[1] == "1":
                 return False
             return True
 

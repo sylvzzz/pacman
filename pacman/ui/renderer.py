@@ -219,8 +219,34 @@ class Screen:
         return [[Wall(w) for w in row] for row in raw_maze]
 
     def render_maze(self, screen, maze) -> None:
-        tile = 10  # size of a non empty character
-        wall = self.colors["blue"]
+        # FUCKING REVIEW THIS
+        # CURRENTLY AI FREE OVERDRAWING SUGGESTED SOLUTION
+
+        """
+
+        ===== ORIGINAL ======
+        def render_maze(self, screen, maze) -> None:
+                tile = 10  # size of a non empty character
+                wall = self.colors["blue"]
+                rows, cols = len(maze), len(maze[0])
+                width, height = cols * 3 * tile, rows * 3 * tile
+                ox = (self.width - width) // 2
+                oy = (self.height - height) // 2
+        
+                for cy, row in enumerate(maze):
+                    for cx, w in enumerate(row):
+                        for i, line in enumerate(w.wall):
+                            for j, ch in enumerate(line):
+                                if ch != " ":
+                                    screen.fill(wall, (ox + (cx * 3 + j) * tile,
+                                                       oy + (cy * 3 + i) * tile,
+                                                       tile, tile))
+        
+        """
+
+        tile = 10
+        wall_color = self.colors["blue"]
+        logo_color = self.colors["gold"]  # "42"
         rows, cols = len(maze), len(maze[0])
         width, height = cols * 3 * tile, rows * 3 * tile
         ox = (self.width - width) // 2
@@ -228,12 +254,16 @@ class Screen:
 
         for cy, row in enumerate(maze):
             for cx, w in enumerate(row):
+                if w.code == 15:
+                    screen.fill(logo_color, (ox + cx * 3 * tile, oy + cy * 3 * tile,
+                                            3 * tile, 3 * tile))
+                    continue
                 for i, line in enumerate(w.wall):
                     for j, ch in enumerate(line):
                         if ch != " ":
-                            screen.fill(wall, (ox + (cx * 3 + j) * tile,
-                                               oy + (cy * 3 + i) * tile,
-                                               tile, tile))
+                            screen.fill(wall_color, (ox + (cx * 3 + j) * tile,
+                                                    oy + (cy * 3 + i) * tile,
+                                                    tile, tile))
 
     def cell_to_pixel(self, cx: int, cy: int, ox: int, oy: int, tile: int,
                       size: int) -> tuple:
@@ -261,29 +291,26 @@ class Screen:
                 self.maze_gen.maze[self.player_y][self.player_x + 1],
                 self.maze_gen.maze[self.player_y + 1][self.player_x],
                 self.maze_gen.maze[self.player_y][self.player_x - 1])
-            
-
-
         
     def can_move(self, direction) -> bool:
         if direction == Directions.NORTH:
             w = Wall(self.neighbor_walls[Directions.NORTH.value])
-            if w.north_is_open:
+            if w.south_is_open:
                 return True
 
         if direction == Directions.EAST:
             w = Wall(self.neighbor_walls[Directions.EAST.value])
-            if w.east_is_open:
+            if w.west_is_open:
                 return True
 
         if direction == Directions.SOUTH:
             w = Wall(self.neighbor_walls[Directions.SOUTH.value])
-            if w.south_is_open:
+            if w.north_is_open:
                 return True
 
         if direction == Directions.WEST:
             w = Wall(self.neighbor_walls[Directions.WEST.value])
-            if w.west_is_open:
+            if w.east_is_open:
                 return True
 
         return False
