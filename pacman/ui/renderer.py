@@ -285,6 +285,28 @@ class Screen:
         x, y = self.cell_to_pixel(to_x, to_y, ox, oy, size)
         player.draw(screen, x, y, size)
 
+    def move_creatures(self, maze_grid, screen, to_x, to_y) -> None:
+            red_ghost = Creature(CreatureType.ENEMY, self.colors["red"])
+            magenta_ghost = Creature(CreatureType.ENEMY, self.colors["magenta"])
+            orange_ghost = Creature(CreatureType.ENEMY, self.colors["orange"])
+            cyan_ghost = Creature(CreatureType.ENEMY, self.colors["cyan"])
+
+            ghosts = [red_ghost, orange_ghost, cyan_ghost, magenta_ghost]
+            
+            rows, cols = len(maze_grid), len(maze_grid[0])
+            ox = (self.width - cols * self.cell_size) // 2
+            oy = (self.height - rows * self.cell_size) // 2
+            size = 3 # this cannot be float !!
+
+            x, y = self.cell_to_pixel(len(maze_grid[0]) - 1, len(maze_grid) - 1, ox, oy, size)
+
+            counter = 2
+            for ghost in ghosts:
+                ghost.draw(screen, x, y, size)
+                x, y = self.cell_to_pixel(len(maze_grid[0]) - counter, len(maze_grid) - counter, ox, oy, size)
+                counter += 1
+
+
     @property
     def neighbor_walls(self) -> tuple:
         # NORTH; EAST; SOUTH; WEST
@@ -372,6 +394,7 @@ class Screen:
                                 screen.fill((0, 0, 0))
                                 self.play(screen, self.maze_gen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 playing = True
                                 reading_name = False
                         elif event.key == pygame.K_BACKSPACE:
@@ -438,6 +461,7 @@ class Screen:
                                 screen.fill((0, 0, 0))
                                 self.play(screen, self.maze_gen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_DOWN and self.player_y < len(self.maze_gen.maze) - 1:
                             if self.can_move(Directions.SOUTH) is True:
@@ -445,6 +469,7 @@ class Screen:
                                 screen.fill((0, 0, 0))
                                 self.play(screen, self.maze_gen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_LEFT and self.player_x > 0:
                             if self.can_move(Directions.WEST) is True:
@@ -452,6 +477,7 @@ class Screen:
                                 screen.fill((0, 0, 0))
                                 self.play(screen, self.maze_gen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_RIGHT and self.player_x < len(self.maze_gen.maze[0]) - 1:
                             if self.can_move(Directions.EAST) is True:
@@ -459,6 +485,7 @@ class Screen:
                                 screen.fill((0, 0, 0))
                                 self.play(screen, self.maze_gen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
