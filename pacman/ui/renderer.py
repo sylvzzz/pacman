@@ -364,7 +364,7 @@ class Screen:
                 x, y = self.cell_to_pixel(len(maze_grid[0]) - counter, len(maze_grid) - counter, ox, oy, size)
                 counter += 1
 
-    def draw_gums(self, maze_grid, screen) -> None:
+    def draw_items(self, maze_grid, screen) -> None:
         small_gum = Creature(CreatureType.SMALL_GUM, self.colors["white"])
         big_gum = Creature(CreatureType.BIG_GUM, self.colors["white"])
         rows, cols = len(maze_grid), len(maze_grid[0])
@@ -551,7 +551,7 @@ class Screen:
                                     self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 screen.fill((0, 0, 0))
                                 self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-                                self.draw_gums(self.maze_gen.maze, screen)
+                                self.draw_items(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
@@ -566,7 +566,7 @@ class Screen:
                                     self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 screen.fill((0, 0, 0))
                                 self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-                                self.draw_gums(self.maze_gen.maze, screen)
+                                self.draw_items(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
@@ -582,7 +582,7 @@ class Screen:
 
                                 screen.fill((0, 0, 0))
                                 self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-                                self.draw_gums(self.maze_gen.maze, screen)
+                                self.draw_items(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
@@ -597,7 +597,7 @@ class Screen:
                                     self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 screen.fill((0, 0, 0))
                                 self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-                                self.draw_gums(self.maze_gen.maze, screen)
+                                self.draw_items(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
