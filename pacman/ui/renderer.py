@@ -50,6 +50,11 @@ class Screen:
         self.TEXT_SIZE = 4
         self.LINE_SPACING = 56
 
+        self.wall_thickness = 5
+        self.corridor_width = 24
+        self.cell_size = self.wall_thickness * 2 + self.corridor_width
+        self.band_size = [self.wall_thickness, self.corridor_width, self.wall_thickness]
+        self.band_offset = [0, self.wall_thickness, self.wall_thickness + self.corridor_width]
         # table of letter blocks, filled once
         self.chars = Character(" ").chars
 
@@ -244,44 +249,40 @@ class Screen:
         
         """
 
-        tile = 10
         wall_color = self.colors["blue"]
-        logo_color = self.colors["gold"]  # "42"
+        logo_color = self.colors["gold"]
         rows, cols = len(maze), len(maze[0])
-        width, height = cols * 3 * tile, rows * 3 * tile
+        width, height = cols * self.cell_size, rows * self.cell_size
         ox = (self.width - width) // 2
         oy = (self.height - height) // 2
 
         for cy, row in enumerate(maze):
             for cx, w in enumerate(row):
+                cell_x = ox + cx * self.cell_size
+                cell_y = oy + cy * self.cell_size
                 if w.code == 15:
-                    screen.fill(logo_color, (ox + cx * 3 * tile, oy + cy * 3 * tile,
-                                            3 * tile, 3 * tile))
+                    screen.fill(logo_color, (cell_x, cell_y, self.cell_size, self.cell_size))
                     continue
                 for i, line in enumerate(w.wall):
                     for j, ch in enumerate(line):
                         if ch != " ":
-                            screen.fill(wall_color, (ox + (cx * 3 + j) * tile,
-                                                    oy + (cy * 3 + i) * tile,
-                                                    tile, tile))
+                            screen.fill(wall_color, (cell_x + self.band_offset[j],
+                                                    cell_y + self.band_offset[i],
+                                                    self.band_size[j],
+                                                    self.band_size[i]))
 
-    def cell_to_pixel(self, cx: int, cy: int, ox: int, oy: int, tile: int,
-                      size: int) -> tuple:
+    def cell_to_pixel(self, cx: int, cy: int, ox: int, oy: int, size: int) -> tuple:
         sprite = 7 * size
-        return (ox + cx * 3 * tile + (3 * tile - sprite) // 2,
-                oy + cy * 3 * tile + (3 * tile - sprite) // 2)
-    
+        return (ox + cx * self.cell_size + (self.cell_size - sprite) // 2,
+                oy + cy * self.cell_size + (self.cell_size - sprite) // 2)
 
     def move_player(self, maze_grid, screen, to_x, to_y) -> None:
         player = Creature(CreatureType.PLAYER, self.colors["yellow"])
-        
-        tile = 10
         rows, cols = len(maze_grid), len(maze_grid[0])
-        ox = (self.width - cols * 3 * tile) // 2
-        oy = (self.height - rows * 3 * tile) // 2
-
-        size = 3
-        x, y = self.cell_to_pixel(to_x, to_y, ox, oy, tile, size)
+        ox = (self.width - cols * self.cell_size) // 2
+        oy = (self.height - rows * self.cell_size) // 2
+        size = 3 # this cannot be float !!
+        x, y = self.cell_to_pixel(to_x, to_y, ox, oy, size)
         player.draw(screen, x, y, size)
 
     @property
