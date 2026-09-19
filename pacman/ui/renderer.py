@@ -306,6 +306,31 @@ class Screen:
                 x, y = self.cell_to_pixel(len(maze_grid[0]) - counter, len(maze_grid) - counter, ox, oy, size)
                 counter += 1
 
+    def draw_gums(self, maze_grid, screen, to_x, to_y) -> None:
+        small_gum = Creature(CreatureType.SMALL_GUM, self.colors["white"])
+        big_gum = Creature(CreatureType.BIG_GUM, self.colors["white"])
+        rows, cols = len(maze_grid), len(maze_grid[0])
+        ox = (self.width - cols * self.cell_size) // 2
+        oy = (self.height - rows * self.cell_size) // 2
+        size = 3 # this cannot be float !!
+        
+
+        for row in range(0, rows):
+            for cell in range(0, cols):
+                x, y = self.cell_to_pixel(cell, row, ox, oy, size)
+                small_gum.draw(screen, x, y, size)
+
+        x, y = self.cell_to_pixel(0, rows - 1, ox, oy, size)
+        big_gum.draw(screen, x, y, size)
+
+        x, y = self.cell_to_pixel(cols - 1, 0, ox, oy, size)
+        big_gum.draw(screen, x, y, size)
+
+        x, y = self.cell_to_pixel(0, rows - 1, ox, oy, size)
+        big_gum.draw(screen, x, y, size)
+        
+        x, y = self.cell_to_pixel(cols - 1, 0, ox, oy, size)
+        big_gum.draw(screen, x, y, size)
 
     @property
     def neighbor_walls(self) -> tuple:
@@ -337,7 +362,6 @@ class Screen:
                 return True
 
         return False
-
 
     def play(self, screen, maze_gen) -> None:
 
@@ -393,6 +417,7 @@ class Screen:
                                 self.save_player(name, points)
                                 screen.fill((0, 0, 0))
                                 self.play(screen, self.maze_gen)
+                                self.draw_gums(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 playing = True
