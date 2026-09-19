@@ -6,6 +6,9 @@ class CreatureType(enum.Enum):
     ENEMY = "enemy"
     BIG_GUM = "big_gum"
     SMALL_GUM = "small_gum"
+    WALL = "wall"
+    EMPTY = "empty"
+
 
 
 class Creature:

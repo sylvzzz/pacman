@@ -9,9 +9,9 @@ from pacman.ui.maze import Wall, WallStatus, Directions
 from pacman.ui.figures import CreatureType, Creature
 from mazegenerator import MazeGenerator
 import pygame
+import random
 import os
 import time
-
 
 
 class Screen:
@@ -42,8 +42,13 @@ class Screen:
         # Create a simple 20x20 maze
         self.maze_gen = MazeGenerator((20, 20))
         self.maze_gen.generate()
-        self.player_x = self.maze_gen.maze_entry[0]
-        self.player_y = self.maze_gen.maze_entry[1]
+        self.maze_width = self.maze_gen._width
+        self.maze_height = self.maze_gen._height
+
+        self.maze_cells = self._populate_cells(random.Random(42), 0.7)
+    
+        self.player_x = self.spawn_point[0]
+        self.player_y = self.spawn_point[1]
 
         self.LETTER_W = 5
         self.LETTER_H = 7
@@ -100,6 +105,59 @@ class Screen:
             pygame.K_UNDERSCORE: "_",
             pygame.K_PERIOD:     ".",
         }
+
+        self.current_level = 1
+
+    def _populate_cells(
+        self, seed: random.Random, density: float
+    ) -> dict[int, dict[int, CreatureType]]:
+        """Fill every cell: walls, player spawn, ghost corners and pacgums
+        scattered over the remaining corridors."""
+        grid = self.maze_gen.maze
+        cells: dict[int, dict[int, CreatureType]] = {}
+        for row in range(len(grid)):
+            cells[row] = {}
+            for col in range(len(grid[row])):
+                cells[row][col] = (
+                    CreatureType.WALL if grid[row][col] == 15
+                    else CreatureType.EMPTY
+                )
+
+        player_x, player_y = self.maze_gen.maze_entry
+        cells[player_y][player_x] = CreatureType.PLAYER
+        corners = [
+            (0, 0), (0, len(grid[0]) - 1),
+            (len(grid) - 1, 0), (len(grid) - 1, len(grid[0]) - 1),
+        ]
+        for ghost_x, ghost_y in corners:
+            cells[ghost_y][ghost_x] = CreatureType.ENEMY
+
+        populated: dict[int, dict[int, CreatureType]] = {}
+        for row, row_cells in cells.items():
+            populated[row] = {}
+            for col, cell_type in row_cells.items():
+                if cell_type is not CreatureType.EMPTY:
+                    populated[row][col] = cell_type
+                elif seed.random() < density:
+                    populated[row][col] = CreatureType.SMALL_GUM
+                else:
+                    populated[row][col] = CreatureType.EMPTY
+        return populated
+
+    @property
+    def spawn_point(self) -> tuple[int, int]:
+        """Célula vazia mais próxima do centro do maze."""
+        center_x, center_y = self.maze_width // 2, self.maze_height // 2
+        empty_cells = (
+            (col, row)
+            for row in range(self.maze_height)
+            for col in range(self.maze_width)
+            if self.maze_cells[row][col] is CreatureType.EMPTY
+        )
+        return min(
+            empty_cells,
+            key=lambda pos: abs(pos[0] - center_x) + abs(pos[1] - center_y),
+        )
 
     def write_char(self, char: str, screen, size: int, x: int, y: int, color = (255, 255, 0)) -> None:
         block = self.chars.get(char, " ")
@@ -306,74 +364,67 @@ class Screen:
                 x, y = self.cell_to_pixel(len(maze_grid[0]) - counter, len(maze_grid) - counter, ox, oy, size)
                 counter += 1
 
-    def draw_gums(self, maze_grid, screen, to_x, to_y) -> None:
+    def draw_gums(self, maze_grid, screen) -> None:
         small_gum = Creature(CreatureType.SMALL_GUM, self.colors["white"])
         big_gum = Creature(CreatureType.BIG_GUM, self.colors["white"])
         rows, cols = len(maze_grid), len(maze_grid[0])
         ox = (self.width - cols * self.cell_size) // 2
         oy = (self.height - rows * self.cell_size) // 2
         size = 3 # this cannot be float !!
-        
+
+        red_ghost = Creature(CreatureType.ENEMY, self.colors["red"])
+        magenta_ghost = Creature(CreatureType.ENEMY, self.colors["magenta"])
+        orange_ghost = Creature(CreatureType.ENEMY, self.colors["orange"])
+        cyan_ghost = Creature(CreatureType.ENEMY, self.colors["cyan"])
+
+        ghosts = [red_ghost, orange_ghost, cyan_ghost, magenta_ghost]
+
+        ghost_index = 0
 
         for row in range(0, rows):
             for cell in range(0, cols):
                 x, y = self.cell_to_pixel(cell, row, ox, oy, size)
-                if maze_grid[row][cell] < 15:
-                    small_gum.draw(screen, x, y, size)
+                if self.maze_cells[row][cell] != CreatureType.EMPTY:
+                    if self.maze_cells[row][cell] == CreatureType.ENEMY:
+                        ghosts[ghost_index].draw(screen, x, y, size)
+                        ghost_index += 1
+                    elif self.maze_cells[row][cell] == CreatureType.BIG_GUM:
+                        big_gum.draw(screen, x, y, size)
+                    elif self.maze_cells[row][cell] == CreatureType.SMALL_GUM:
+                        small_gum.draw(screen, x, y, size)
 
-        x, y = self.cell_to_pixel(0, rows - 1, ox, oy, size)
-        big_gum.draw(screen, x, y, size)
-
-        x, y = self.cell_to_pixel(cols - 1, 0, ox, oy, size)
-        big_gum.draw(screen, x, y, size)
-
-        x, y = self.cell_to_pixel(0, rows - 1, ox, oy, size)
-        big_gum.draw(screen, x, y, size)
-        
-        x, y = self.cell_to_pixel(cols - 1, 0, ox, oy, size)
-        big_gum.draw(screen, x, y, size)
-
-    @property
-    def neighbor_walls(self) -> tuple:
-        # NORTH; EAST; SOUTH; WEST
-        return (self.maze_gen.maze[self.player_y - 1][self.player_x],
-                self.maze_gen.maze[self.player_y][self.player_x + 1],
-                self.maze_gen.maze[self.player_y + 1][self.player_x],
-                self.maze_gen.maze[self.player_y][self.player_x - 1])
+    def neighbor_wall(self, direction: Directions) -> int:
+        x, y = self.player_x, self.player_y
+        if direction == Directions.NORTH:
+            return self.maze_gen.maze[y - 1][x]
+        if direction == Directions.EAST:
+            return self.maze_gen.maze[y][x + 1]
+        if direction == Directions.SOUTH:
+            return self.maze_gen.maze[y + 1][x]
+        return self.maze_gen.maze[y][x - 1]
         
     def can_move(self, direction) -> bool:
         if direction == Directions.NORTH:
-            w = Wall(self.neighbor_walls[Directions.NORTH.value])
+            w = Wall(self.neighbor_wall(Directions.NORTH))
             if w.south_is_open:
                 return True
 
         if direction == Directions.EAST:
-            w = Wall(self.neighbor_walls[Directions.EAST.value])
+            w = Wall(self.neighbor_wall(Directions.EAST))
             if w.west_is_open:
                 return True
 
         if direction == Directions.SOUTH:
-            w = Wall(self.neighbor_walls[Directions.SOUTH.value])
+            w = Wall(self.neighbor_wall(Directions.SOUTH))
             if w.north_is_open:
                 return True
 
         if direction == Directions.WEST:
-            w = Wall(self.neighbor_walls[Directions.WEST.value])
+            w = Wall(self.neighbor_wall(Directions.WEST))
             if w.east_is_open:
                 return True
 
-        return False
-
-    def play(self, screen, maze_gen) -> None:
-
-        # Get the maze structure
-        maze_grid = maze_gen.maze
-        shortest_path = maze_gen.shortest_path
-        
-        # print(f"Maze dimensions: {len(maze_grid[0])}x{len(maze_grid)}")
-        # print(f"Shortest path length: {len(shortest_path)}")
-
-        self.render_maze(screen, self.code_to_walls(maze_grid))
+        return False        
 
     def save_player(self, name: str, points: int) -> None:
         import json
@@ -403,6 +454,7 @@ class Screen:
         playing = False
         reading_name = False
         points = 0
+
         while running:
             for event in pygame.event.get():
                 at_home_page = True
@@ -415,12 +467,17 @@ class Screen:
                             reading_name = False
                         if event.key == pygame.K_RETURN:
                             if self.valid_name(name):
+                                player = {
+                                    "name": name,
+                                    "points": 0
+                                }
+
                                 self.save_player(name, points)
                                 screen.fill((0, 0, 0))
-                                self.play(screen, self.maze_gen)
-                                self.draw_gums(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                                self.draw_gums(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
-                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 playing = True
                                 reading_name = False
                         elif event.key == pygame.K_BACKSPACE:
@@ -438,6 +495,8 @@ class Screen:
                         continue
 
                     if event.key == pygame.K_q:
+                        if player is not None:
+                            self.save_player(player["name"], player["points"])
                         running = False
 
                     elif event.key == pygame.K_DOWN and not playing:
@@ -478,40 +537,69 @@ class Screen:
                         if event.key == pygame.K_r:
                             screen.fill((0, 0, 0))
                             self.maze_gen.generate()
-                            self.play(screen, self.maze_gen)
+                            self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
                             playing = True
 
                         if event.key == pygame.K_UP and self.player_y > 0:
                             if self.can_move(Directions.NORTH) is True:
                                 self.player_y -= 1
+                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
+                                    player["points"] += 15
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
+                                    player["points"] += 50
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 screen.fill((0, 0, 0))
-                                self.play(screen, self.maze_gen)
+                                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                                self.draw_gums(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
-                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_DOWN and self.player_y < len(self.maze_gen.maze) - 1:
                             if self.can_move(Directions.SOUTH) is True:
                                 self.player_y += 1
+                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
+                                    player["points"] += 15
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
+                                    player["points"] += 50
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 screen.fill((0, 0, 0))
-                                self.play(screen, self.maze_gen)
+                                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                                self.draw_gums(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
-                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_LEFT and self.player_x > 0:
                             if self.can_move(Directions.WEST) is True:
                                 self.player_x -= 1
+                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
+                                    player["points"] += 15
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
+                                    player["points"] += 50
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+
                                 screen.fill((0, 0, 0))
-                                self.play(screen, self.maze_gen)
+                                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                                self.draw_gums(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
-                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_RIGHT and self.player_x < len(self.maze_gen.maze[0]) - 1:
                             if self.can_move(Directions.EAST) is True:
                                 self.player_x += 1
+                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
+                                    player["points"] += 15
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
+                                    player["points"] += 50
+                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 screen.fill((0, 0, 0))
-                                self.play(screen, self.maze_gen)
+                                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                                self.draw_gums(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
-                                self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
+                                # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
