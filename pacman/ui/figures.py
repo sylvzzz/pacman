@@ -41,11 +41,11 @@ class Creature:
                 "##.##.##.",
             ),
             CreatureType.SMALL_GUM: (
+                ".....",
                 "..#..",
                 ".###.",
-                "#####",
-                ".###.",
                 "..#..",
+                ".....",
             ),
             CreatureType.BIG_GUM: (
                 "..###..",

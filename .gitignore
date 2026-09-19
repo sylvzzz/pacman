@@ -10,9 +10,6 @@ __pycache__/
 .venv/
 venv/
 
-# Packaging output
-build/
-dist/
 
 # Editors / OS
 .idea/
@@ -26,3 +23,5 @@ subject.md
 
 project_management/
 vendor/
+
+players.json

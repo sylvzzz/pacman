@@ -318,7 +318,8 @@ class Screen:
         for row in range(0, rows):
             for cell in range(0, cols):
                 x, y = self.cell_to_pixel(cell, row, ox, oy, size)
-                small_gum.draw(screen, x, y, size)
+                if maze_grid[row][cell] < 15:
+                    small_gum.draw(screen, x, y, size)
 
         x, y = self.cell_to_pixel(0, rows - 1, ox, oy, size)
         big_gum.draw(screen, x, y, size)
