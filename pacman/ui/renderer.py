@@ -5,8 +5,9 @@ Planned contents: Canvas (pixel-buffer access, hand-rasterised rects/circles/tex
 """
 from pacman.ui.blockfont import Character
 from pacman.ui.log import Logger
-from pacman.ui.maze import Wall
+from pacman.ui.maze import Wall, WallStatus, Directions
 from pacman.ui.figures import CreatureType, Creature
+from mazegenerator import MazeGenerator
 import pygame
 import os
 import time
@@ -37,6 +38,12 @@ class Screen:
             "magenta":  (255, 8, 255),
             "lime":  (80, 252, 7),
         }
+
+        # Create a simple 20x20 maze
+        self.maze_gen = MazeGenerator((20, 20))
+        self.maze_gen.generate()
+        self.player_x = self.maze_gen.maze_entry[0]
+        self.player_y = self.maze_gen.maze_entry[1]
 
         self.LETTER_W = 5
         self.LETTER_H = 7
@@ -246,7 +253,41 @@ class Screen:
         size = 3
         x, y = self.cell_to_pixel(to_x, to_y, ox, oy, tile, size)
         player.draw(screen, x, y, size)
+
+    @property
+    def neighbor_walls(self) -> tuple:
+        # NORTH; EAST; SOUTH; WEST
+        return (self.maze_gen.maze[self.player_y - 1][self.player_x],
+                self.maze_gen.maze[self.player_y][self.player_x + 1],
+                self.maze_gen.maze[self.player_y + 1][self.player_x],
+                self.maze_gen.maze[self.player_y][self.player_x - 1])
+            
+
+
         
+    def can_move(self, direction) -> bool:
+        if direction == Directions.NORTH:
+            w = Wall(self.neighbor_walls[Directions.NORTH.value])
+            if w.north_is_open:
+                return True
+
+        if direction == Directions.EAST:
+            w = Wall(self.neighbor_walls[Directions.EAST.value])
+            if w.east_is_open:
+                return True
+
+        if direction == Directions.SOUTH:
+            w = Wall(self.neighbor_walls[Directions.SOUTH.value])
+            if w.south_is_open:
+                return True
+
+        if direction == Directions.WEST:
+            w = Wall(self.neighbor_walls[Directions.WEST.value])
+            if w.west_is_open:
+                return True
+
+        return False
+
 
     def play(self, screen, maze_gen) -> None:
 
@@ -276,13 +317,6 @@ class Screen:
             os._exit(1)
 
     def run(self) -> None:
-        from mazegenerator import MazeGenerator
-
-        # Create a simple 20x20 maze
-        maze_gen = MazeGenerator((20, 20))
-        maze_gen.generate()
-        player_x = maze_gen.maze_entry[0]
-        player_y = maze_gen.maze_entry[1]
 
         pygame.init()
         screen = pygame.display.set_mode((self.width, self.height))
@@ -308,8 +342,8 @@ class Screen:
                             if self.valid_name(name):
                                 self.save_player(name, points)
                                 screen.fill((0, 0, 0))
-                                self.play(screen, maze_gen)
-                                self.move_player(maze_gen.maze, screen, player_x, player_y)
+                                self.play(screen, self.maze_gen)
+                                self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 playing = True
                                 reading_name = False
                         elif event.key == pygame.K_BACKSPACE:
@@ -366,35 +400,39 @@ class Screen:
                     elif playing is True:
                         if event.key == pygame.K_r:
                             screen.fill((0, 0, 0))
-                            maze_gen.generate()
-                            self.play(screen, maze_gen)
+                            self.maze_gen.generate()
+                            self.play(screen, self.maze_gen)
                             playing = True
 
-                        if event.key == pygame.K_UP and player_y > 0:
-                            player_y -= 1
-                            screen.fill((0, 0, 0))
-                            self.play(screen, maze_gen)
-                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+                        if event.key == pygame.K_UP and self.player_y > 0:
+                            if self.can_move(Directions.NORTH) is True:
+                                self.player_y -= 1
+                                screen.fill((0, 0, 0))
+                                self.play(screen, self.maze_gen)
+                                self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
-                        if event.key == pygame.K_DOWN and player_y < len(maze_gen.maze) - 1:
-                            player_y += 1
-                            screen.fill((0, 0, 0))
-                            self.play(screen, maze_gen)
-                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+                        if event.key == pygame.K_DOWN and self.player_y < len(self.maze_gen.maze) - 1:
+                            if self.can_move(Directions.SOUTH) is True:
+                                self.player_y += 1
+                                screen.fill((0, 0, 0))
+                                self.play(screen, self.maze_gen)
+                                self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
-                        if event.key == pygame.K_LEFT and player_x > 0:
-                            player_x -= 1
-                            screen.fill((0, 0, 0))
-                            self.play(screen, maze_gen)
-                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+                        if event.key == pygame.K_LEFT and self.player_x > 0:
+                            if self.can_move(Directions.WEST) is True:
+                                self.player_x -= 1
+                                screen.fill((0, 0, 0))
+                                self.play(screen, self.maze_gen)
+                                self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
-                        if event.key == pygame.K_RIGHT and player_x < len(maze_gen.maze[0]) - 1:
-                            player_x += 1
-                            screen.fill((0, 0, 0))
-                            self.play(screen, maze_gen)
-                            self.move_player(maze_gen.maze, screen, player_x, player_y)
+                        if event.key == pygame.K_RIGHT and self.player_x < len(self.maze_gen.maze[0]) - 1:
+                            if self.can_move(Directions.EAST) is True:
+                                self.player_x += 1
+                                screen.fill((0, 0, 0))
+                                self.play(screen, self.maze_gen)
+                                self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
-                        Logger.success(f"X: {player_x}, Y: {player_y}")
+                        Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
             selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
