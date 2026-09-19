@@ -475,7 +475,7 @@ class Screen:
                                 self.save_player(name, points)
                                 screen.fill((0, 0, 0))
                                 self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-                                self.draw_gums(self.maze_gen.maze, screen)
+                                self.draw_items(self.maze_gen.maze, screen)
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 playing = True
