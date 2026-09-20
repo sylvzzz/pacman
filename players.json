@@ -1,26 +1,23 @@
-[
-  {
-    "name": "denys",
+{
+  "denys": {
     "score": 1425
   },
-  {
-    "name": "sylvzz",
+  "sylvzz": {
     "score": 3042
   },
-  {
-    "name": "dbaltaza",
+  "dbaltaza": {
     "score": 2931
   },
-  {
-    "name": "gguia-ma",
+  "gguia-ma": {
     "score": 0
   },
-  {
-    "name": "manel-puta",
+  "manel-puta": {
     "score": 0
   },
-  {
-    "name": "sofia",
+  "sofia": {
     "score": 3012
+  },
+  "okk": {
+    "score": 345
   }
-]
+}

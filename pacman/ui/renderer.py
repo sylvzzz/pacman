@@ -44,8 +44,10 @@ class Screen:
         self.maze_gen.generate()
         self.maze_width = self.maze_gen._width
         self.maze_height = self.maze_gen._height
-
-        self.maze_cells = self._populate_cells(random.Random(42), 0.7)
+        self.current_level = 1
+        self.maze_cells = self._populate_cells(
+            random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
+        )
     
         self.player_x = self.spawn_point[0]
         self.player_y = self.spawn_point[1]
@@ -105,8 +107,6 @@ class Screen:
             pygame.K_UNDERSCORE: "_",
             pygame.K_PERIOD:     ".",
         }
-
-        self.current_level = 1
 
     def _populate_cells(
         self, seed: random.Random, density: float
@@ -263,10 +263,10 @@ class Screen:
         
         start_y += 30
 
-        players = sorted(players, key=lambda player: player['score'], reverse=True)
+        players = sorted(players.items(), key=lambda item: item[1]['score'], reverse=True)
         rank = 1
-        for player in players:
-            text = f'{rank}  -  {player["name"]}  -  {player["score"]}'
+        for name, player_data in players:
+            text = f'{rank}  -  {name}  -  {player_data["score"]}'
             x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if rank > 3:
                 self.write(text, screen, x, start_y + rank * self.LINE_SPACING, self.TEXT_SIZE, yellow)
@@ -282,12 +282,9 @@ class Screen:
         return [[Wall(w) for w in row] for row in raw_maze]
 
     def render_maze(self, screen, maze) -> None:
-        # FUCKING REVIEW THIS
-        # CURRENTLY AI FREE OVERDRAWING SUGGESTED SOLUTION
-
         """
 
-        ===== ORIGINAL ======
+        ===== previous (in case i nid it) ======
         def render_maze(self, screen, maze) -> None:
                 tile = 10  # size of a non empty character
                 wall = self.colors["blue"]
@@ -432,7 +429,11 @@ class Screen:
         try:
             with open("players.json", "r") as file:
                 players = json.load(file)
-                players.append({"name": name, "score": points})
+                if players.get(name, False):
+                    players[name]["score"] += points
+                else:
+                    players[name] = {}
+                    players[name]["score"] = points
             with open("players.json", "w") as file:
                 json.dump(players, file, indent=2)
         except json.JSONDecodeError:
@@ -539,6 +540,17 @@ class Screen:
                             self.maze_gen.generate()
                             self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
                             playing = True
+                        if event.key == pygame.K_n:
+                            screen.fill((0, 0, 0))
+                            self.maze_gen.generate()
+                            self.current_level += 1
+                            self.maze_cells = self._populate_cells(
+                                random.Random(self.current_level),
+                                max(1 - (self.current_level * 0.3), 0.3),
+                            )
+                            self.draw_items(self.maze_gen.maze, screen)
+                            self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                            playing = True
 
                         if event.key == pygame.K_UP and self.player_y > 0:
                             if self.can_move(Directions.NORTH) is True:
@@ -601,7 +613,7 @@ class Screen:
                                 self.move_player(self.maze_gen.maze, screen, self.player_x, self.player_y)
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
-                        Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
+                        # Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
             selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
