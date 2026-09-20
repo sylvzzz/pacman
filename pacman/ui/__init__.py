@@ -9,4 +9,4 @@ from pacman.ui.log import Logger
 from pacman.ui.maze import Wall, WallStatus, Directions
 from pacman.ui.figures import CreatureType, Creature
 
-__all__ = ["Screen", "Character", "Logger", "Wall", "CreatureType", "Creature", "WallStatus", "Directions"]
+__all__ = ["Screen", "Character", "Logger", "Wall", "CreatureType", "Creature", "WallStatus", "Directions", "Logger"]

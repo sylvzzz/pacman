@@ -6,9 +6,9 @@ every PacManError into a message on stderr and an exit code
 (2 usage, 1 error, 130 keyboard interrupt). Never a traceback.
 """
 
+from pacman import ui
 
 def main() -> None:
-    from pacman import ui
 
     screen = ui.Screen(1200, 720)
     screen.run()
@@ -16,4 +16,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        ui.Logger.error("\nGame interruped by user ...")
