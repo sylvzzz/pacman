@@ -496,8 +496,11 @@ class Screen:
                         continue
 
                     if event.key == pygame.K_q:
-                        if player is not None:
-                            self.save_player(player["name"], player["points"])
+                        try:
+                            if player is not None:
+                                self.save_player(player["name"], player["points"])
+                        except UnboundLocalError:
+                            pass
                         running = False
 
                     elif event.key == pygame.K_DOWN and not playing:
