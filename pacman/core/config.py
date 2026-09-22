@@ -181,11 +181,16 @@ def read_config_file(path: str) -> dict[str, object]:
 
 
 def _pick_int(raw: dict[str, object], key: str, default: int,
-              minimum: int, maximum: int) -> int:
+              minimum: int, maximum: int, context: str = "") -> int:
     """Return ``raw[key]`` as an int within bounds, else *default*.
 
     Missing key: *default*, silently.  Wrong type: WARNING and
     *default*.  Out of range: WARNING and the nearer bound.
+
+    *context* names the enclosing structure for nested keys, so the
+    warning for a bad ``width`` inside the seventh level entry reads
+    ``levels[6].width`` instead of a bare ``width`` that a reviewer
+    cannot locate.  Top-level keys pass nothing and read as before.
 
     Careful: ``bool`` subclasses ``int`` in Python, so
     ``isinstance(True, int)`` is True and ``"lives": true`` would
@@ -194,15 +199,16 @@ def _pick_int(raw: dict[str, object], key: str, default: int,
     if key not in raw:
         return default
     value = raw[key]
+    label = f"{context}.{key}" if context else key
     if isinstance(value, bool) or not isinstance(value, int):
         get_logger().warning(
-            f"{key}: expected a whole number, got {value!r};"
+            f"{label}: expected a whole number, got {value!r};"
             f" using {default}")
         return default
     if value < minimum or value > maximum:
         clamped = min(maximum, max(minimum, value))
         get_logger().warning(
-            f"{key}: {value} is out of range"
+            f"{label}: {value} is out of range"
             f" [{minimum}, {maximum}]; using {clamped}")
         return clamped
     return value
@@ -307,10 +313,11 @@ def _level_spec_from(entry: object, index: int) -> LevelSpec | None:
             f"levels[{index}]: expected an object with width and"
             f" height, got {entry!r}; ignoring this level")
         return None
+    where = f"levels[{index}]"
     width = _pick_int(entry, "width", DEFAULT_LEVELS[0].width,
-                      MIN_LEVEL_SIZE, MAX_LEVEL_SIZE)
+                      MIN_LEVEL_SIZE, MAX_LEVEL_SIZE, where)
     height = _pick_int(entry, "height", DEFAULT_LEVELS[0].height,
-                       MIN_LEVEL_SIZE, MAX_LEVEL_SIZE)
+                       MIN_LEVEL_SIZE, MAX_LEVEL_SIZE, where)
     return LevelSpec(width, height)
 
 

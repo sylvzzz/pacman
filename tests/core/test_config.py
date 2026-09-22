@@ -494,6 +494,23 @@ def test_levels_entry_missing_height_uses_a_default() -> None:
     assert build_config(raw).levels[0].width == 12
 
 
+def test_levels_bad_size_names_the_level(
+    log_records: RecordingHandler,
+) -> None:
+    """A bad width must say WHICH level entry it was in.
+
+    Every other message in this module names its key.  With ten levels
+    and a bad width in the seventh, a bare "width: 1 is out of range"
+    leaves the reviewer no way to find the entry to edit.
+    """
+    good: dict[str, object] = {"width": 14, "height": 10}
+    raw: dict[str, object] = {
+        "levels": [good] * 6 + [{"width": 1, "height": 9}] + [good] * 3,
+    }
+    build_config(raw)
+    assert any("levels[6].width" in line for line in log_records.warnings)
+
+
 def test_levels_all_entries_bad_uses_defaults() -> None:
     """Nothing usable in the list at all: fall back."""
     raw: dict[str, object] = {"levels": ["a", 1, None]}
