@@ -17,8 +17,11 @@ So ``build_config`` never raises, and ``read_config_file`` is the only
 function here that can.  The config is swapped during the defense, so
 every branch above will be exercised by a reviewer.
 """
-
+import json
+import math
 from dataclasses import dataclass, fields
+from .errors import ConfigError
+from .log import get_logger
 
 # Imports you will need to add as you fill the bodies below, kept out
 # for now so `make lint-strict` stays green on the scaffold:
@@ -119,14 +122,14 @@ def strip_comments(text: str) -> str:
     kept, because ``{"name": "a # b"}`` is valid JSON and cutting at the
     ``#`` would corrupt it.
     """
-    # TODO (you):
-    # 1. Split text into lines -- text.splitlines() drops the line
-    #    endings, which is what you want here.
-    # 2. For each line: if line.lstrip() startswith any of
-    #    COMMENT_PREFIXES, replace it with "", else keep it unchanged.
-    #    A tuple works directly: str.startswith(COMMENT_PREFIXES).
-    # 3. Join the result with "\n" and return it.
-    raise NotImplementedError("strip_comments")
+
+    kept = []
+    for line in text.split("\n"):
+        if line.lstrip().startswith(COMMENT_PREFIXES):
+            kept.append("")
+        else:
+            kept.append(line)
+    return "\n".join(kept)
 
 
 def read_config_file(path: str) -> dict[str, object]:
@@ -147,20 +150,35 @@ def read_config_file(path: str) -> dict[str, object]:
     Raises:
         ConfigError: with a distinct message for each case above.
     """
-    # TODO (you):
-    # 1. open(path, encoding="utf-8") inside a `with`, read the text.
-    #    Catch the exceptions above one by one -- IsADirectoryError
-    #    before OSError, since it is a subclass and a bare `except
-    #    OSError` first would swallow it.  Re-raise each as ConfigError
-    #    with its own sentence naming `path`.
-    # 2. Feed the text through strip_comments().
-    # 3. json.loads() it, catching json.JSONDecodeError.  Its .lineno
-    #    and .msg are worth putting in the message -- that is what
-    #    blanking comment lines above bought you.
-    # 4. Check isinstance(data, dict).  A file holding `[1, 2]` parses
-    #    fine but is not a config; raise ConfigError saying so.
-    # 5. Return the dict.
-    raise NotImplementedError("read_config_file")
+    try:
+        with open(path, encoding="utf-8") as config_file:
+            text = config_file.read()
+    except FileNotFoundError as e:
+        raise ConfigError(f"config file not found: {path}") from e
+    except IsADirectoryError as e:
+        raise ConfigError(
+            f"config path is a directory, not a file: {path}") from e
+    except PermissionError as e:
+        raise ConfigError(
+            f"config file cannot be opened for reading: {path}") from e
+    except UnicodeDecodeError as e:
+        raise ConfigError(
+            f"config file is not valid UTF-8 text: {path}") from e
+    except OSError as e:
+        raise ConfigError(f"could not read {path}: {e}") from e
+
+    try:
+        data = json.loads(strip_comments(text))
+    except json.JSONDecodeError as e:
+        raise ConfigError(
+            f"{path} is not valid JSON: {e.msg}, line {e.lineno}"
+            f" column {e.colno}") from e
+
+    if not isinstance(data, dict):
+        raise ConfigError(
+            f"{path} must hold a JSON object,"
+            f" found {type(data).__name__}")
+    return data
 
 
 def _pick_int(raw: dict[str, object], key: str, default: int,
@@ -174,16 +192,21 @@ def _pick_int(raw: dict[str, object], key: str, default: int,
     ``isinstance(True, int)`` is True and ``"lives": true`` would
     quietly become 1 life.  Reject bools before the int check.
     """
-    # TODO (you):
-    # 1. If key not in raw: return default (no log -- a missing key is
-    #    normal, subject V.3).
-    # 2. value = raw[key].  If isinstance(value, bool) or not
-    #    isinstance(value, int): log WARNING naming the key, the bad
-    #    value and the default you are using, then return default.
-    # 3. If value < minimum or value > maximum: log WARNING and return
-    #    the bound you clamped to.
-    # 4. Return value.
-    raise NotImplementedError("_pick_int")
+    if key not in raw:
+        return default
+    value = raw[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        get_logger().warning(
+            f"{key}: expected a whole number, got {value!r};"
+            f" using {default}")
+        return default
+    if value < minimum or value > maximum:
+        clamped = min(maximum, max(minimum, value))
+        get_logger().warning(
+            f"{key}: {value} is out of range"
+            f" [{minimum}, {maximum}]; using {clamped}")
+        return clamped
+    return value
 
 
 def _pick_float(raw: dict[str, object], key: str, default: float,
@@ -198,11 +221,26 @@ def _pick_float(raw: dict[str, object], key: str, default: float,
     ``frightened_time`` would make every ``timer > 0`` comparison false
     forever, so the ghosts would stay edible for the rest of the game.
     """
-    # TODO (you): same shape as _pick_int, plus
-    # - accept int *and* float (still rejecting bool),
-    # - after the type check, reject values where not math.isfinite(v),
-    # - return float(value) so the type is always float, never int.
-    raise NotImplementedError("_pick_float")
+    if key not in raw:
+        return default
+    value = raw[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        get_logger().warning(
+            f"{key}: expected a number, got {value!r};"
+            f" using {default}")
+        return default
+    if not math.isfinite(value):
+        get_logger().warning(
+            f"{key}: {value} is not a finite number;"
+            f" using {default}")
+        return default
+    if value < minimum or value > maximum:
+        clamped = min(maximum, max(minimum, value))
+        get_logger().warning(
+            f"{key}: {value} is out of range"
+            f" [{minimum}, {maximum}]; using {clamped}")
+        return float(clamped)
+    return float(value)
 
 
 def _pick_bool(raw: dict[str, object], key: str, default: bool) -> bool:
@@ -213,9 +251,15 @@ def _pick_bool(raw: dict[str, object], key: str, default: bool) -> bool:
     truthy string is how a config silently does the opposite of what
     the file says.
     """
-    # TODO (you): missing -> default; not isinstance(value, bool) ->
-    # WARNING + default; else the value.
-    raise NotImplementedError("_pick_bool")
+    if key not in raw:
+        return default
+    value = raw[key]
+    if not isinstance(value, bool):
+        get_logger().warning(
+            f"{key}: expected true or false, got {value!r};"
+            f" using {default}")
+        return default
+    return value
 
 
 def _pick_filename(raw: dict[str, object], key: str,
@@ -228,14 +272,29 @@ def _pick_filename(raw: dict[str, object], key: str,
     refusing separators keeps a typo in the config from writing
     somewhere else on disk.
     """
-    # TODO (you):
-    # 1. Missing -> default.
-    # 2. not isinstance(value, str) -> WARNING + default.
-    # 3. not value.strip() -> WARNING + default.
-    # 4. "\0" in value, "/" in value or "\\" in value -> WARNING +
-    #    default.
-    # 5. Return value.
-    raise NotImplementedError("_pick_filename")
+    if key not in raw:
+        return default
+    value = raw[key]
+    if not isinstance(value, str):
+        get_logger().warning(
+            f"{key}: expected a filename string, got {value!r};"
+            f" using {default!r}")
+        return default
+    if not value.strip():
+        get_logger().warning(
+            f"{key}: the filename is empty; using {default!r}")
+        return default
+    if "\0" in value:
+        get_logger().warning(
+            f"{key}: the filename contains a NUL byte;"
+            f" using {default!r}")
+        return default
+    if "/" in value or "\\" in value:
+        get_logger().warning(
+            f"{key}: {value!r} must be a plain filename, not a path;"
+            f" using {default!r}")
+        return default
+    return value
 
 
 def _level_spec_from(entry: object, index: int) -> LevelSpec | None:
