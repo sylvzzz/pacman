@@ -1,0 +1,47 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    branches: [main, silva, dbaltaza]
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Pull Request diff
+        run: |
+          {
+            echo "=== CHANGED FILES ==="
+            git diff origin/${{ github.base_ref }}...HEAD --name-status
+            echo ""
+            echo "=== CHANGE SCALE ==="
+            git diff origin/${{ github.base_ref }}...HEAD --stat
+            echo ""
+            echo "=== FULL DIFF ==="
+            git diff origin/${{ github.base_ref }}...HEAD
+          } > diff.txt
+          echo "Tamanho do diff:"
+          wc -l diff.txt
+
+      - name: Build repo context for review
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: python3 scripts/build_context.py
+
+      - name: Run AI Review
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: python3 scripts/ai-review.py
