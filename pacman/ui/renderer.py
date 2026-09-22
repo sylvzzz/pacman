@@ -369,13 +369,13 @@ class Screen:
             if (start_x, start_y) == (end_x, end_y):
                 break
             if direction == Directions.NORTH:
-                start_y -= 1
+                start_y -= 2
             elif direction == Directions.SOUTH:
-                start_y += 1
+                start_y += 2
             elif direction == Directions.WEST:
-                start_x -= 1
+                start_x -= 2
             elif direction == Directions.EAST:
-                start_x += 1
+                start_x += 2
             pygame.display.flip()
 
     def move_creatures(self, maze_grid, screen, to_x, to_y) -> None:
