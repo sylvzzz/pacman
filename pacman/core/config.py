@@ -303,14 +303,16 @@ def _level_spec_from(entry: object, index: int) -> LevelSpec | None:
     *index* only appears in the log message, so a reviewer editing the
     file is told *which* entry was wrong.
     """
-    # TODO (you):
-    # 1. If not isinstance(entry, dict): WARNING, return None.
-    # 2. Pull "width" and "height".  Reuse _pick_int by passing the
-    #    entry dict itself -- that is why _pick_int takes a dict and a
-    #    key instead of a bare value.  Bounds: MIN_LEVEL_SIZE and
-    #    MAX_LEVEL_SIZE, defaults from DEFAULT_LEVELS[0].
-    # 3. Return LevelSpec(width, height).
-    raise NotImplementedError("_level_spec_from")
+    if not isinstance(entry, dict):
+        get_logger().warning(
+            f"levels[{index}]: expected an object with width and"
+            f" height, got {entry!r}; ignoring this level")
+        return None
+    width = _pick_int(entry, "width", DEFAULT_LEVELS[0].width,
+                      MIN_LEVEL_SIZE, MAX_LEVEL_SIZE)
+    height = _pick_int(entry, "height", DEFAULT_LEVELS[0].height,
+                       MIN_LEVEL_SIZE, MAX_LEVEL_SIZE)
+    return LevelSpec(width, height)
 
 
 def _pad_levels(specs: list[LevelSpec]) -> list[LevelSpec]:
@@ -319,14 +321,18 @@ def _pad_levels(specs: list[LevelSpec]) -> list[LevelSpec]:
     Subject VI.7 requires at least ten levels, so a short ``levels``
     array is repaired rather than rejected.
     """
-    # TODO (you):
-    # 1. If len(specs) >= MIN_LEVELS: return specs unchanged.
-    # 2. Log one WARNING (not one per added level) saying how many were
-    #    given and how many you are padding to.
-    # 3. Append copies of the last spec -- or grow it by a cell each
-    #    time, your choice -- until len() == MIN_LEVELS, clamping to
-    #    MAX_LEVEL_SIZE.  Document whichever you pick in the README.
-    raise NotImplementedError("_pad_levels")
+    if len(specs) >= MIN_LEVELS:
+        return specs
+    get_logger().warning(
+        f"levels: only {len(specs)} given but at least {MIN_LEVELS}"
+        f" are required; padding to {MIN_LEVELS}")
+    padded = list(specs)
+    while len(padded) < MIN_LEVELS:
+        last = padded[-1]
+        padded.append(LevelSpec(
+            min(MAX_LEVEL_SIZE, last.width + 1),
+            min(MAX_LEVEL_SIZE, last.height + 1)))
+    return padded
 
 
 def _pick_levels(raw: dict[str, object]) -> tuple[LevelSpec, ...]:
@@ -335,21 +341,33 @@ def _pick_levels(raw: dict[str, object]) -> tuple[LevelSpec, ...]:
     Falls back to DEFAULT_LEVELS when the key is missing, is not a list,
     is empty, or holds nothing usable at all.
     """
-    # TODO (you):
-    # 1. "levels" not in raw -> return DEFAULT_LEVELS silently.
-    # 2. not isinstance(value, list) -> WARNING + DEFAULT_LEVELS.
-    # 3. Map _level_spec_from over the entries, dropping the Nones.
-    # 4. If the result is empty -> WARNING + DEFAULT_LEVELS.
-    # 5. Otherwise return tuple(_pad_levels(specs)).
-    raise NotImplementedError("_pick_levels")
+    if "levels" not in raw:
+        return DEFAULT_LEVELS
+    value = raw["levels"]
+    if not isinstance(value, list):
+        get_logger().warning(
+            f"levels: expected a list of sizes, got {value!r};"
+            f" using the {len(DEFAULT_LEVELS)} built-in levels")
+        return DEFAULT_LEVELS
+    specs = [spec for spec in (_level_spec_from(entry, index)
+                               for index, entry in enumerate(value))
+             if spec is not None]
+    if not specs:
+        get_logger().warning(
+            f"levels: no usable level sizes found;"
+            f" using the {len(DEFAULT_LEVELS)} built-in levels")
+        return DEFAULT_LEVELS
+    return tuple(_pad_levels(specs))
 
 
 def _warn_unknown_keys(raw: dict[str, object]) -> None:
     """Log one INFO line per key that is not a setting (subject V.3)."""
-    # TODO (you): iterate sorted(raw) so the output order is stable, and
-    # log INFO for each key not in known_keys().  Sorting matters: a
-    # test that asserts on the messages should not depend on dict order.
-    raise NotImplementedError("_warn_unknown_keys")
+    known = known_keys()
+    # sorted() so the output order does not depend on dict insertion
+    # order, which would make a test asserting on messages flaky.
+    for key in sorted(raw):
+        if key not in known:
+            get_logger().info(f"unknown config key ignored: {key!r}")
 
 
 def build_config(raw: dict[str, object]) -> GameConfig:
@@ -359,29 +377,47 @@ def build_config(raw: dict[str, object]) -> GameConfig:
     replaced by the _pick_* helpers, so whatever a reviewer puts in the
     file, the game still starts.
     """
-    # TODO (you):
-    # 1. _warn_unknown_keys(raw).
-    # 2. One _pick_* call per GameConfig field, passing the bounds.
-    #    Suggested ranges -- adjust if you can justify it in the README:
-    #      lives                    1 .. 99
-    #      points_per_*             0 .. 100_000
-    #      seed                     MIN_SEED .. MAX_SEED
-    #      level_max_time         5.0 .. 3600.0
-    #      frightened_time        0.5 .. 60.0
-    #      ghost_respawn_time     0.5 .. 60.0
-    #      ready_time             0.0 .. 10.0
-    #      player_speed           0.5 .. 20.0
-    #      ghost_speed            0.5 .. 20.0
-    #      pacgum_density           1 .. 100   <- floor is 1, not 0: a
-    #                                            density of 0 places no
-    #                                            pacgums, and "all
-    #                                            pacgums eaten" would
-    #                                            be true on frame 1.
-    #      window_width           320 .. 3840
-    #      window_height          240 .. 2160
-    #      fps                     10 .. 240
-    # 3. Return GameConfig(...) with keyword arguments.
-    raise NotImplementedError("build_config")
+
+    _warn_unknown_keys(raw)
+    defaults = GameConfig()
+    return GameConfig(
+        highscore_filename=_pick_filename(
+            raw, "highscore_filename", defaults.highscore_filename),
+        lives=_pick_int(raw, "lives", defaults.lives, 1, 99),
+        points_per_pacgum=_pick_int(
+            raw, "points_per_pacgum",
+            defaults.points_per_pacgum, 0, 100_000),
+        points_per_super_pacgum=_pick_int(
+            raw, "points_per_super_pacgum",
+            defaults.points_per_super_pacgum, 0, 100_000),
+        points_per_ghost=_pick_int(
+            raw, "points_per_ghost",
+            defaults.points_per_ghost, 0, 100_000),
+        seed=_pick_int(raw, "seed", defaults.seed, MIN_SEED, MAX_SEED),
+        level_max_time=_pick_float(
+            raw, "level_max_time", defaults.level_max_time, 5.0, 3600.0),
+        frightened_time=_pick_float(
+            raw, "frightened_time", defaults.frightened_time, 0.5, 60.0),
+        ghost_respawn_time=_pick_float(
+            raw, "ghost_respawn_time",
+            defaults.ghost_respawn_time, 0.5, 60.0),
+        ready_time=_pick_float(
+            raw, "ready_time", defaults.ready_time, 0.0, 10.0),
+        player_speed=_pick_float(
+            raw, "player_speed", defaults.player_speed, 0.5, 20.0),
+        ghost_speed=_pick_float(
+            raw, "ghost_speed", defaults.ghost_speed, 0.5, 20.0),
+        pacgum_density=_pick_int(
+            raw, "pacgum_density", defaults.pacgum_density, 1, 100),
+        cheats_enabled=_pick_bool(
+            raw, "cheats_enabled", defaults.cheats_enabled),
+        window_width=_pick_int(
+            raw, "window_width", defaults.window_width, 320, 3840),
+        window_height=_pick_int(
+            raw, "window_height", defaults.window_height, 240, 2160),
+        fps=_pick_int(raw, "fps", defaults.fps, 10, 240),
+        levels=_pick_levels(raw),
+    )
 
 
 def load_config(path: str) -> GameConfig:
@@ -392,5 +428,4 @@ def load_config(path: str) -> GameConfig:
             *values* never reach here -- they are warned about and
             repaired by build_config().
     """
-    # TODO (you): two lines -- read_config_file() then build_config().
-    raise NotImplementedError("load_config")
+    return build_config(read_config_file(path))
