@@ -1,6 +1,5 @@
 """Tiny logging helper writing clear messages to stderr.
 
-Owner: Person A
 Contents: get_logger().
 
 Every WARNING and INFO line the subject asks for in V.3 goes through
