@@ -20,9 +20,11 @@ def py_files() -> Iterator[str]:
 
 
 def changed_files(base_ref: str) -> List[str]:
-    out = os.popen(
-        f"git diff origin/{base_ref}...HEAD --name-only -- '*.py'"
-    ).read()
+    # PR events pass a branch name; push events pass a commit SHA.
+    ref = f"origin/{base_ref}"
+    if os.system(f"git rev-parse --verify --quiet {ref} > /dev/null"):
+        ref = base_ref
+    out = os.popen(f"git diff {ref}...HEAD --name-only -- '*.py'").read()
     return [f for f in out.splitlines() if f.strip()]
 
 

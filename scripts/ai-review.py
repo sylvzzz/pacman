@@ -7,7 +7,7 @@ from typing import Any, Dict, cast
 
 NVIDIA_API_KEY = os.environ["NVIDIA_API_KEY"]
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
-PR_NUMBER = os.environ["PR_NUMBER"]
+PR_NUMBER = os.environ.get("PR_NUMBER")
 REPO = os.environ["REPO"]
 
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -150,9 +150,13 @@ def main() -> None:
 
     review = call_nvidia_api(diff, read_context())
     body = build_comment_body(review)
-    post_comment(body)
-
-    print(f"Review posted. Severity: {review.get('severity', 'none')}")
+    if PR_NUMBER:
+        post_comment(body)
+        print(f"Review posted. Severity: {review.get('severity', 'none')}")
+    else:
+        print("Push event: review below (no PR to comment on).")
+        print(body)
+        print(f"Severity: {review.get('severity', 'none')}")
 
     if review.get("severity") == "critical":
         print("Critical issues detected. Failing the step.")
