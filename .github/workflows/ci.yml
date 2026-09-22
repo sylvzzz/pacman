@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, silva, dbaltaza]
   push:
-    branches: [main, silva, dbaltaza]
+    branches: [main]
 
 jobs:
   build-and-test:
