@@ -1,6 +1,5 @@
 """Configuration loading with comment support and safe defaults.
 
-Owner: Person A
 Contents: LevelSpec, GameConfig, strip_comments(), read_config_file(),
   the _pick_* clamping helpers, build_config(), load_config().
 
