@@ -145,6 +145,65 @@ def test_read_config_file_not_utf8(tmp_path: Path) -> None:
         read_config_file(str(path))
 
 
+def test_read_config_file_accepts_a_utf8_bom(tmp_path: Path) -> None:
+    """A byte-order mark must not reject an otherwise valid config.
+
+    Editors on Windows write a BOM by default, and a BOM is not legal
+    JSON, so a plain "utf-8" read refuses a good file.
+    """
+    path = tmp_path / "bom.json"
+    path.write_bytes(b"\xef\xbb\xbf" + b'{"lives": 5}')
+    assert read_config_file(str(path)) == {"lives": 5}
+
+
+def test_read_config_file_deeply_nested(tmp_path: Path) -> None:
+    """Deep nesting raises RecursionError inside json, not ValueError.
+
+    RecursionError is a RuntimeError, so the JSONDecodeError and
+    ValueError clauses cannot see it.  Unhandled, it reaches the user
+    as a traceback.
+    """
+    path = tmp_path / "deep.json"
+    path.write_text("[" * 200_000, encoding="utf-8")
+    with pytest.raises(ConfigError):
+        read_config_file(str(path))
+
+
+def test_read_config_file_deeply_nested_object(tmp_path: Path) -> None:
+    """The same hole, reached through nested objects instead of arrays."""
+    path = tmp_path / "deepo.json"
+    path.write_text('{"a":' * 100_000 + "1" + "}" * 100_000,
+                    encoding="utf-8")
+    with pytest.raises(ConfigError):
+        read_config_file(str(path))
+
+
+def test_read_config_file_absurdly_long_number(tmp_path: Path) -> None:
+    """A bare ValueError from json.loads must still be a ConfigError.
+
+    CPython caps integer/string conversion at 4300 digits and raises a
+    plain ValueError -- NOT a JSONDecodeError, which is only a subclass
+    of it.  Catching the subclass does not catch the parent.
+    """
+    path = tmp_path / "big.json"
+    path.write_text('{"seed": ' + "9" * 5000 + "}", encoding="utf-8")
+    with pytest.raises(ConfigError):
+        read_config_file(str(path))
+
+
+def test_read_config_file_duplicate_keys_take_the_last(
+    tmp_path: Path,
+) -> None:
+    """Documented behaviour: JSON leaves duplicates undefined.
+
+    Python keeps the last occurrence.  Pinned here so the choice is
+    deliberate rather than accidental.
+    """
+    path = tmp_path / "dup.json"
+    path.write_text('{"lives": 3, "lives": 99}', encoding="utf-8")
+    assert read_config_file(str(path)) == {"lives": 99}
+
+
 def test_read_config_file_messages_are_distinct(tmp_path: Path) -> None:
     """Different failures must not share one message (style rule).
 

@@ -23,13 +23,6 @@ from dataclasses import dataclass, fields
 from .errors import ConfigError
 from .log import get_logger
 
-# Imports you will need to add as you fill the bodies below, kept out
-# for now so `make lint-strict` stays green on the scaffold:
-#     import json                     -- read_config_file
-#     import math                     -- _pick_float (math.isfinite)
-#     from .errors import ConfigError -- read_config_file
-#     from .log import get_logger     -- every _pick_* and the warnings
-
 COMMENT_PREFIXES = ("#", "//")
 
 # At least 10 levels are mandatory (subject VI.7).
@@ -151,7 +144,7 @@ def read_config_file(path: str) -> dict[str, object]:
         ConfigError: with a distinct message for each case above.
     """
     try:
-        with open(path, encoding="utf-8") as config_file:
+        with open(path, encoding="utf-8-sig") as config_file:
             text = config_file.read()
     except FileNotFoundError as e:
         raise ConfigError(f"config file not found: {path}") from e
@@ -173,6 +166,12 @@ def read_config_file(path: str) -> dict[str, object]:
         raise ConfigError(
             f"{path} is not valid JSON: {e.msg}, line {e.lineno}"
             f" column {e.colno}") from e
+    except RecursionError as e:
+        raise ConfigError(
+            f"{path} is nested too deeply to parse") from e
+    except ValueError as e:
+        raise ConfigError(
+            f"{path} holds a value JSON cannot represent: {e}") from e
 
     if not isinstance(data, dict):
         raise ConfigError(
@@ -363,8 +362,6 @@ def _pick_levels(raw: dict[str, object]) -> tuple[LevelSpec, ...]:
 def _warn_unknown_keys(raw: dict[str, object]) -> None:
     """Log one INFO line per key that is not a setting (subject V.3)."""
     known = known_keys()
-    # sorted() so the output order does not depend on dict insertion
-    # order, which would make a test asserting on messages flaky.
     for key in sorted(raw):
         if key not in known:
             get_logger().info(f"unknown config key ignored: {key!r}")
