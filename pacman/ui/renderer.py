@@ -103,9 +103,6 @@ class Screen:
             pygame.K_7:   "7",
             pygame.K_8:   "8",
             pygame.K_9:   "9",
-            pygame.K_MINUS:      "-",
-            pygame.K_UNDERSCORE: "_",
-            pygame.K_PERIOD:     ".",
         }
 
     def _populate_cells(
@@ -565,7 +562,7 @@ class Screen:
                             self.set_player_name(screen, name)
                         else:
                             ch = self.key_chars.get(event.key)
-                            if ch and len(name) < 28:
+                            if ch and len(name) < 10:
                                 if ch.isalpha() and event.mod & (pygame.KMOD_SHIFT | pygame.KMOD_CAPS):
                                     ch = ch.upper()
                                 elif ch == "-" and event.mod & pygame.KMOD_SHIFT:
