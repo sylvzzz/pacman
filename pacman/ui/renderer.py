@@ -535,7 +535,7 @@ class Screen:
 
         while running:
             if direction is not None and playing is True:
-                points += self.game_loop(screen, direction, points)
+                points = self.game_loop(screen, direction, points)
             for event in pygame.event.get():
                 at_home_page = True
 
@@ -635,7 +635,7 @@ class Screen:
                             playing = True
 
                         if event.key == pygame.K_UP and self.player_y > 0:
-                            if self.can_move(Directions.SOUTH) is True:
+                            if self.can_move(Directions.NORTH) is True:
                                 direction = Directions.NORTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
