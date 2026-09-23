@@ -8,7 +8,6 @@ from pacman.ui.log import Logger
 from pacman.ui.maze import Wall, WallStatus, Directions
 from pacman.ui.figures import CreatureType, Creature
 from mazegenerator import MazeGenerator
-from functools import lru_cache
 import pygame
 import random
 import os
@@ -167,7 +166,6 @@ class Screen:
                             screen.set_at((x + col * size + i, y + row * size + j),
                                           color)
 
-    @lru_cache(maxsize=100)
     def text_width(self, text: str, size: int) -> int:
         return len(text) * self.LETTER_W * size + (len(text) - 1) * 5
 
@@ -544,7 +542,7 @@ class Screen:
             os._exit(1)
 
     def game_loop(self, screen, direction: Directions, points) -> int:
-        screen.fill((0, 0, 0))
+        self.clear(screen)
         self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
         self.draw_items(self.maze_gen.maze, screen)
 
@@ -678,15 +676,13 @@ class Screen:
                             if event.key == pygame.K_UP:
                                 pause_idx -= 1
                                 menu_option = pause_idx % 2
-                                self.clear(screen)
-                                self.game_loop(screen, direction, points)
+                                self.game_loop(screen, None, points)
                                 self.tinted_window(screen)
                                 self.pause_menu(screen, menu_option)
                             if event.key == pygame.K_DOWN:
                                 pause_idx += 1
                                 menu_option = pause_idx % 2
-                                self.clear(screen)
-                                self.game_loop(screen, direction, points)
+                                self.game_loop(screen, None, points)
                                 self.tinted_window(screen)
                                 self.pause_menu(screen, menu_option)
                         if event.key == pygame.K_RETURN and on_pause is True and menu_option == 0:
