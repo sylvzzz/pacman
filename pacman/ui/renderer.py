@@ -387,22 +387,23 @@ class Screen:
         start_x, start_y = self.cell_to_pixel(or_x, or_y, ox, oy, size)
         end_x, end_y = self.cell_to_pixel(to_x, to_y, ox, oy, size)
 
-        while True:
-            screen.fill((0, 0, 0))
-            self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-            self.draw_items(self.maze_gen.maze, screen)
-            player.draw(screen, start_x, start_y, size)
-            if (start_x, start_y) == (end_x, end_y):
-                break
-            if direction == Directions.NORTH:
-                start_y -= 1
-            elif direction == Directions.SOUTH:
-                start_y += 1
-            elif direction == Directions.WEST:
-                start_x -= 1
-            elif direction == Directions.EAST:
-                start_x += 1
-            pygame.display.flip()
+        if direction is not None:
+            while True:
+                screen.fill((0, 0, 0))
+                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                self.draw_items(self.maze_gen.maze, screen)
+                player.draw(screen, start_x, start_y, size)
+                if (start_x, start_y) == (end_x, end_y):
+                    break
+                if direction == Directions.NORTH:
+                    start_y -= 1
+                elif direction == Directions.SOUTH:
+                    start_y += 1
+                elif direction == Directions.WEST:
+                    start_x -= 1
+                elif direction == Directions.EAST:
+                    start_x += 1
+                pygame.display.flip()
 
     def move_creatures(self, maze_grid, screen, to_x, to_y) -> None:
             red_ghost = Creature(CreatureType.ENEMY, self.colors["red"])
@@ -548,6 +549,7 @@ class Screen:
         direction = None
         on_pause = False
         pause_idx = 0
+        menu_option = pause_idx % 2
 
         while running:
             if direction is not None and playing is True and on_pause is not True:
@@ -649,6 +651,7 @@ class Screen:
                             self.show_menu(screen, 0)
                             on_pause = False
                             playing = False
+                            direction = None
                         elif event.key == pygame.K_ESCAPE and on_pause is False:
                             self.pause_menu(screen, menu_option)
                             on_pause = True
