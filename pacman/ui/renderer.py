@@ -717,4 +717,4 @@ class Screen:
             selected = menu_idx % len(self.menu_options)
             menu_option = pause_idx % 2
             pygame.display.flip()
-            time.sleep(0.1)
+            time.sleep(0.001)
