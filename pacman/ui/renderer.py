@@ -256,6 +256,24 @@ class Screen:
             x = (self.width - self.text_width(line, self.TEXT_SIZE)) // 2
             self.write(line, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
 
+    def tinted_window(self, screen):
+        dark_rate = 2
+        step = 2
+        tone = (0, 10, 30)
+
+        for x in range(0, self.width, step):
+            for y in range(0, self.height, step):
+                color = screen.get_at((x, y))
+                r = min(255, (color[0] >> dark_rate) + tone[0])
+                g = min(255, (color[1] >> dark_rate) + tone[1])
+                b = min(255, (color[2] >> dark_rate) + tone[2])
+                nova_cor = (r, g, b)
+                for dx in range(step):
+                    for dy in range(step):
+                        fx, fy = x + dx, y + dy
+                        if fx < self.width and fy < self.height:
+                            screen.set_at((fx, fy), nova_cor)
+
     def show_highscores(self, screen) -> None:
         import json
 
@@ -653,6 +671,7 @@ class Screen:
                             playing = False
                             direction = None
                         elif event.key == pygame.K_ESCAPE and on_pause is False:
+                            self.tinted_window(screen)
                             self.pause_menu(screen, menu_option)
                             on_pause = True
 
@@ -674,22 +693,22 @@ class Screen:
                             playing = True
 
                         if event.key == pygame.K_UP and self.player_y > 0:
-                            if self.can_move(Directions.NORTH) is True:
+                            if self.can_move(Directions.NORTH) is True and on_pause is not True:
                                 direction = Directions.NORTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_DOWN and self.player_y < len(self.maze_gen.maze) - 1:
-                            if self.can_move(Directions.SOUTH) is True:
+                            if self.can_move(Directions.SOUTH) is True and on_pause is not True:
                                 direction = Directions.SOUTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_LEFT and self.player_x > 0:
-                            if self.can_move(Directions.WEST) is True:
+                            if self.can_move(Directions.WEST) is True and on_pause is not True:
                                 direction = Directions.WEST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_RIGHT and self.player_x < len(self.maze_gen.maze[0]) - 1:
-                            if self.can_move(Directions.EAST) is True:
+                            if self.can_move(Directions.EAST) is True and on_pause is not True:
                                 direction = Directions.EAST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
