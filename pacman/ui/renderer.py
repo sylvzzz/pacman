@@ -203,7 +203,7 @@ class Screen:
         if not text:
             return False
         for char in text:
-            if char.lower() not in "abcdefghijklmnopqrstuvwxyz0123456789-._":
+            if char.lower() not in "abcdefghijklmnopqrstuvwxyz0123456789":
                 return False
         return True
 

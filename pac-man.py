@@ -10,7 +10,7 @@ from pacman import ui
 
 def main() -> None:
 
-    screen = ui.Screen(1200, 720)
+    screen = ui.Screen(780, 720)
     screen.run()
     
 
