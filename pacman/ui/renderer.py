@@ -500,21 +500,29 @@ class Screen:
         
     def can_move(self, direction) -> bool:
         if direction == Directions.NORTH:
+            if self.player_y - 1 == len(self.maze_gen.maze):
+                return False
             w = Wall(self.neighbor_wall(Directions.NORTH))
             if w.south_is_open and self.player_y > 0:
                 return True
 
         if direction == Directions.EAST:
+            if self.player_x + 1 == len(self.maze_gen.maze[0]):
+                return False
             w = Wall(self.neighbor_wall(Directions.EAST))
             if w.west_is_open and self.player_x < len(self.maze_gen.maze[0]) - 1:
                 return True
 
         if direction == Directions.SOUTH:
+            if self.player_y + 1 == len(self.maze_gen.maze):
+                return False
             w = Wall(self.neighbor_wall(Directions.SOUTH))
             if w.north_is_open and self.player_y < len(self.maze_gen.maze) - 1:
                 return True
 
         if direction == Directions.WEST:
+            if self.player_x - 1 == len(self.maze_gen.maze[0]):
+                return False
             w = Wall(self.neighbor_wall(Directions.WEST))
             if w.east_is_open and self.player_x > 0:
                 return True
@@ -553,16 +561,16 @@ class Screen:
             points += 50
             self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
 
-        if self.can_move(direction) is True:
-            self.move_player(self.maze_gen.maze, screen, (self.player_x, self.player_y), direction)
-            if direction == Directions.NORTH:
-                self.player_y -= 1
-            if direction == Directions.SOUTH:
-                self.player_y += 1
-            if direction == Directions.WEST:
-                self.player_x -= 1
-            if direction == Directions.EAST:
-                self.player_x += 1
+        if direction is not None and self.can_move(direction) is True:
+                self.move_player(self.maze_gen.maze, screen, (self.player_x, self.player_y), direction)
+                if direction == Directions.NORTH:
+                    self.player_y -= 1
+                if direction == Directions.SOUTH:
+                    self.player_y += 1
+                if direction == Directions.WEST:
+                    self.player_x -= 1
+                if direction == Directions.EAST:
+                    self.player_x += 1
         else:
             self.spawn_player(self.maze_gen.maze, screen, [self.player_x, self.player_y])
 
