@@ -223,6 +223,23 @@ class Screen:
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
 
+    def pause_menu(self, screen, selected = -1) -> None:
+        pause_options = ["Resume", "Main Menu"]
+        start_y = (self.height - self.text_height(pause_options, self.TEXT_SIZE)) // 2
+        yellow = self.colors["yellow"]
+
+        x = (self.width - self.text_width("PAUSED", self.TEXT_SIZE + 2)) // 2
+        self.write("PAUSED", screen, x, start_y - 20 - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
+
+        start_y += 30
+
+        for i, text in enumerate(pause_options):
+            x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+            if i == selected:
+                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
+            else:
+                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
+
     def show_instructions(self, screen) -> None:
         lines = []
         try:
@@ -529,9 +546,11 @@ class Screen:
         reading_name = False
         points = 0
         direction = None
+        on_pause = False
+        pause_idx = 0
 
         while running:
-            if direction is not None and playing is True:
+            if direction is not None and playing is True and on_pause is not True:
                 points = self.game_loop(screen, direction, points)
             for event in pygame.event.get():
                 at_home_page = True
@@ -589,7 +608,7 @@ class Screen:
                             menu_idx -= 1
                             self.show_menu(screen, menu_idx)
 
-                    elif event.key == pygame.K_RETURN:
+                    elif event.key == pygame.K_RETURN and playing is not True:
                         Logger.log(self.menu_options[selected])
                         if self.menu_options[selected] == "Exit":
                             running = False
@@ -598,22 +617,42 @@ class Screen:
                             name = ""
                             reading_name = True
                             self.set_player_name(screen, name)
+                            at_home_page = False
                                 
                         if self.menu_options[selected] == "View Highscores":
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.show_highscores(screen)
-                            at_home_page = False
 
                         if self.menu_options[selected] == "Instructions":
                             screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                             self.show_instructions(screen)
-                            at_home_page = False
 
                     elif not playing and at_home_page and event.key == pygame.K_LEFT:
                         screen.fill((0, 0, 0))  # review this, since pygame dont have _clear_window of the mlx
                         self.show_menu(screen)
 
                     elif playing is True:
+                        if on_pause is True:
+                            if event.key == pygame.K_UP:
+                                pause_idx -= 1
+                                menu_option = pause_idx % 2
+                                self.pause_menu(screen, menu_option)
+                            if event.key == pygame.K_DOWN:
+                                pause_idx += 1
+                                menu_option = pause_idx % 2
+                                self.pause_menu(screen, menu_option)
+                        if event.key == pygame.K_RETURN and on_pause is True and menu_option == 0:
+                            self.game_loop(screen, direction, points)
+                            on_pause = False
+                        elif event.key == pygame.K_RETURN and on_pause is True and menu_option == 1:
+                            screen.fill((0, 0, 0))
+                            self.show_menu(screen, 0)
+                            on_pause = False
+                            playing = False
+                        elif event.key == pygame.K_ESCAPE and on_pause is False:
+                            self.pause_menu(screen, menu_option)
+                            on_pause = True
+
                         if event.key == pygame.K_r:
                             screen.fill((0, 0, 0))
                             self.maze_gen.generate()
@@ -654,5 +693,6 @@ class Screen:
                         # Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
             selected = menu_idx % len(self.menu_options)
+            menu_option = pause_idx % 2
             pygame.display.flip()
             time.sleep(0.1)
