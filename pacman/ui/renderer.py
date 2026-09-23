@@ -493,10 +493,18 @@ class Screen:
             Logger.error(f"File {error.filename} not found ...")
             os._exit(1)
 
-    def game_loop(self, screen, direction: Directions) -> None:
+    def game_loop(self, screen, direction: Directions, points) -> int:
         screen.fill((0, 0, 0))
         self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
         self.draw_items(self.maze_gen.maze, screen)
+
+        if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
+            points += 15
+            self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+        elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
+            points += 50
+            self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+
         if self.can_move(direction) is True:
             self.move_player(self.maze_gen.maze, screen, (self.player_x, self.player_y), direction)
             if direction == Directions.NORTH:
@@ -509,6 +517,8 @@ class Screen:
                 self.player_x += 1
         else:
             self.spawn_player(self.maze_gen.maze, screen, [self.player_x, self.player_y])
+
+        return points
 
     def run(self) -> None:
 
@@ -525,7 +535,7 @@ class Screen:
 
         while running:
             if direction is not None and playing is True:
-                self.game_loop(screen, direction)
+                points += self.game_loop(screen, direction, points)
             for event in pygame.event.get():
                 at_home_page = True
 
@@ -625,45 +635,22 @@ class Screen:
                             playing = True
 
                         if event.key == pygame.K_UP and self.player_y > 0:
-                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
-                                    player["points"] += 15
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
-                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
-                                    player["points"] += 50
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
+                            if self.can_move(Directions.SOUTH) is True:
                                 direction = Directions.NORTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_DOWN and self.player_y < len(self.maze_gen.maze) - 1:
                             if self.can_move(Directions.SOUTH) is True:
-                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
-                                    player["points"] += 15
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
-                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
-                                    player["points"] += 50
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 direction = Directions.SOUTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_LEFT and self.player_x > 0:
                             if self.can_move(Directions.WEST) is True:
-                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
-                                    player["points"] += 15
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
-                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
-                                    player["points"] += 50
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 direction = Directions.WEST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_RIGHT and self.player_x < len(self.maze_gen.maze[0]) - 1:
                             if self.can_move(Directions.EAST) is True:
-                                if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
-                                    player["points"] += 15
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
-                                elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
-                                    player["points"] += 50
-                                    self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
                                 direction = Directions.EAST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
