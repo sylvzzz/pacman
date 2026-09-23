@@ -8,6 +8,7 @@ from pacman.ui.log import Logger
 from pacman.ui.maze import Wall, WallStatus, Directions
 from pacman.ui.figures import CreatureType, Creature
 from mazegenerator import MazeGenerator
+from functools import lru_cache
 import pygame
 import random
 import os
@@ -166,6 +167,7 @@ class Screen:
                             screen.set_at((x + col * size + i, y + row * size + j),
                                           color)
 
+    @lru_cache(maxsize=100)
     def text_width(self, text: str, size: int) -> int:
         return len(text) * self.LETTER_W * size + (len(text) - 1) * 5
 
@@ -220,6 +222,7 @@ class Screen:
             x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if i == selected:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
+                self.write("_" * len(text), screen, x, start_y + (i + 0.1) * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
 
@@ -237,6 +240,7 @@ class Screen:
             x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if i == selected:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
+                self.write("_" * len(text), screen, x, start_y + (i + 0.1) * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
 
@@ -259,20 +263,33 @@ class Screen:
     def tinted_window(self, screen):
         dark_rate = 2
         step = 2
-        tone = (0, 10, 30)
+        tone = (1, 1, 1)
 
-        for x in range(0, self.width, step):
-            for y in range(0, self.height, step):
+        for x in range(self.width // 4, self.width - self.width // 4, step):
+            for y in range(self.height // 4, self.height - self.height // 4, step):
                 color = screen.get_at((x, y))
                 r = min(255, (color[0] >> dark_rate) + tone[0])
                 g = min(255, (color[1] >> dark_rate) + tone[1])
                 b = min(255, (color[2] >> dark_rate) + tone[2])
-                nova_cor = (r, g, b)
+                new_color = (r, g, b)
                 for dx in range(step):
                     for dy in range(step):
                         fx, fy = x + dx, y + dy
                         if fx < self.width and fy < self.height:
-                            screen.set_at((fx, fy), nova_cor)
+                            screen.set_at((fx, fy), new_color)
+
+    def menu_popup(self, screen):
+        dark_rate = 2
+        step = 2
+        color = (1, 1, 1)
+
+        for x in range(self.width // 4, self.width - self.width // 4, step):
+            for y in range(self.height // 4, self.height - self.height // 4, step):
+                for dx in range(step):
+                    for dy in range(step):
+                        fx, fy = x + dx, y + dy
+                        if fx < self.width and fy < self.height:
+                            screen.set_at((fx, fy), color)
 
     def show_highscores(self, screen) -> None:
         import json
@@ -553,6 +570,9 @@ class Screen:
 
         return points
 
+    def clear(self, screen):
+        screen.fill((0,0,0))
+
     def run(self) -> None:
 
         pygame.init()
@@ -621,11 +641,13 @@ class Screen:
                     elif event.key == pygame.K_DOWN and not playing:
                         if menu_idx < len(self.menu_options) - 1:
                             menu_idx += 1
+                            self.clear(screen)
                             self.show_menu(screen, menu_idx)
 
                     elif event.key == pygame.K_UP and not playing:
                         if menu_idx > 0:
                             menu_idx -= 1
+                            self.clear(screen)
                             self.show_menu(screen, menu_idx)
 
                     elif event.key == pygame.K_RETURN and playing is not True:
@@ -656,10 +678,16 @@ class Screen:
                             if event.key == pygame.K_UP:
                                 pause_idx -= 1
                                 menu_option = pause_idx % 2
+                                self.clear(screen)
+                                self.game_loop(screen, direction, points)
+                                self.tinted_window(screen)
                                 self.pause_menu(screen, menu_option)
                             if event.key == pygame.K_DOWN:
                                 pause_idx += 1
                                 menu_option = pause_idx % 2
+                                self.clear(screen)
+                                self.game_loop(screen, direction, points)
+                                self.tinted_window(screen)
                                 self.pause_menu(screen, menu_option)
                         if event.key == pygame.K_RETURN and on_pause is True and menu_option == 0:
                             self.game_loop(screen, direction, points)
