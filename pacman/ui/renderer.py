@@ -366,28 +366,28 @@ class Screen:
             player.draw(screen, x, y, size)
 
     def move_player(self, maze_grid, screen, origin: tuple[int, int], direction: Directions) -> None:
-        player = Creature(CreatureType.PLAYER, self.colors["yellow"])
-
-        rows, cols = len(maze_grid), len(maze_grid[0])
-        ox = (self.width - cols * self.cell_size) // 2
-        oy = (self.height - rows * self.cell_size) // 2
-
-        size = 3 # this cannot be float !!
-
-        or_x, or_y = origin
-        if direction == Directions.NORTH:
-            to_x, to_y = or_x, or_y - 1
-        elif direction == Directions.SOUTH:
-            to_x, to_y = or_x, or_y + 1
-        elif direction == Directions.WEST:
-            to_x, to_y = or_x - 1, or_y
-        elif direction == Directions.EAST:
-            to_x, to_y = or_x + 1, or_y
-
-        start_x, start_y = self.cell_to_pixel(or_x, or_y, ox, oy, size)
-        end_x, end_y = self.cell_to_pixel(to_x, to_y, ox, oy, size)
-
         if direction is not None:
+            player = Creature(CreatureType.PLAYER, self.colors["yellow"])
+
+            rows, cols = len(maze_grid), len(maze_grid[0])
+            ox = (self.width - cols * self.cell_size) // 2
+            oy = (self.height - rows * self.cell_size) // 2
+
+            size = 3 # this cannot be float !!
+
+            or_x, or_y = origin
+            if direction == Directions.NORTH:
+                to_x, to_y = or_x, or_y - 1
+            elif direction == Directions.SOUTH:
+                to_x, to_y = or_x, or_y + 1
+            elif direction == Directions.WEST:
+                to_x, to_y = or_x - 1, or_y
+            elif direction == Directions.EAST:
+                to_x, to_y = or_x + 1, or_y
+
+            start_x, start_y = self.cell_to_pixel(or_x, or_y, ox, oy, size)
+            end_x, end_y = self.cell_to_pixel(to_x, to_y, ox, oy, size)
+
             while True:
                 screen.fill((0, 0, 0))
                 self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
