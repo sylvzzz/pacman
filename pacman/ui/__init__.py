@@ -1,4 +1,5 @@
-"""UI: rendering, screens, input and app loop. Owner: Person B.
+"""UI: rendering, screens, input and app loop.
 
-Imports ``pacman.core``; only ``renderer`` and ``app`` may call pygame.
+Owner: Person B.  Imports ``pacman.core``; only ``renderer`` and ``app`` may
+call pygame.
 """
