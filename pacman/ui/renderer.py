@@ -250,6 +250,32 @@ class Screen:
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
 
+    def cheat_menu(self, screen, selected = -1) -> None:
+        """
+        Invincibility (no life lost; ghosts cannot eat the player).
+        Level skip (immediately win the current level).
+        Ghost freeze (ghosts stop moving).
+        Extra lives (add extra lives to the player).
+        Increased speed (player moves faster).
+        Any other feature that may be useful.
+        """
+        cheat_options = ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED"]
+        start_y = (self.height - self.text_height(cheat_options, self.TEXT_SIZE)) // 2
+        yellow = self.colors["yellow"]
+
+        x = (self.width - self.text_width("CHEAT MENU", self.TEXT_SIZE + 2)) // 2
+        self.write("CHEAT MENU", screen, x, start_y - 20 - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
+
+        start_y += 30
+
+        for i, text in enumerate(cheat_options):
+            x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+            if i == selected:
+                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
+                self.write("_" * len(text), screen, x, start_y + (i + 0.1) * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
+            else:
+                self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
+
     def show_instructions(self, screen) -> None:
         lines = []
         try:
@@ -265,13 +291,14 @@ class Screen:
         for i, line in enumerate(lines):
             x = (self.width - self.text_width(line, self.TEXT_SIZE)) // 2
             self.write(line, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
-
+ 
     def tinted_window(self, screen):
         dark_rate = 2
         step = 2
         tone = (1, 1, 1)
 
-        for x in range(self.width // 4, self.width - self.width // 4, step):
+        # THIS HAMMERS THE H*LL OUTTA CPU, fixed it by using // 5 instead of whole screen
+        for x in range(self.width // 4, self.width - self.width // 5, step):
             for y in range(self.height // 4, self.height - self.height // 4, step):
                 color = screen.get_at((x, y))
                 r = min(255, (color[0] >> dark_rate) + tone[0])
@@ -592,16 +619,25 @@ class Screen:
         pygame.init()
         screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.flip()
-        menu_idx = 0
+
         running = True
-        self.show_menu(screen, menu_idx)
         playing = False
         reading_name = False
-        points = 0
+        at_home_page = True
         direction = None
         on_pause = False
+        cheat_on = False
+        pressed_first_cheat = False
+
+        points = 0
         pause_idx = 0
+        menu_idx = 0
+        cheat_idx = 0
         menu_option = pause_idx % 2
+        cheat_option = cheat_idx % 4
+
+
+        self.show_menu(screen, menu_idx)
 
         while running:
             if direction is not None and playing is True and on_pause is not True:
@@ -688,6 +724,29 @@ class Screen:
                         self.show_menu(screen)
 
                     elif playing is True:
+                        if cheat_on is True:
+                            if event.key == pygame.K_UP:
+                                cheat_idx -= 1
+                                cheat_option = cheat_idx % 4
+                                self.game_loop(screen, None, points)
+                                self.tinted_window(screen)
+                                self.cheat_menu(screen, cheat_option)
+                            if event.key == pygame.K_DOWN:
+                                cheat_idx += 1
+                                cheat_option = cheat_idx % 4
+                                self.game_loop(screen, None, points)
+                                self.tinted_window(screen)
+                                self.cheat_menu(screen, cheat_option)
+                        if pressed_first_cheat is False and event.key == pygame.K_4:
+                            pressed_first_cheat = True
+                        if pressed_first_cheat is True and event.key == pygame.K_2:
+                            cheat_on = True
+                            cheat_option = cheat_idx % 4
+                            self.game_loop(screen, None, points)
+                            self.tinted_window(screen)
+                            self.cheat_menu(screen, cheat_option)
+                        elif pressed_first_cheat is True and event.key != pygame.K_2:
+                            continue
                         if on_pause is True:
                             if event.key == pygame.K_UP:
                                 pause_idx -= 1
@@ -755,6 +814,5 @@ class Screen:
                         # Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
             selected = menu_idx % len(self.menu_options)
-            menu_option = pause_idx % 2
             pygame.display.flip()
-            time.sleep(0.1)
+            time.sleep(0.001)
