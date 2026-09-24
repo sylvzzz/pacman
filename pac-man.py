@@ -6,13 +6,11 @@ Planned contents: imports pacman.ui.app; parse_arguments() raising UsageError,
   (2 usage, 1 error, 130 keyboard interrupt). Never a traceback.
 """
 
-from pacman import ui
+from pacman import ui, core
 
 def main() -> None:
-
-    screen = ui.Screen(780, 720)
-    screen.run()
-    
+    game_config = core.load_config("config.json")
+    print(game_config)
 
 
 if __name__ == "__main__":

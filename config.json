@@ -3,7 +3,7 @@
 # is clamped or replaced with a warning, unknown keys are ignored.
 {
     "highscore_filename": "highscores.json",
-    "lives": 3,
+    "lives": 5,
     "points_per_pacgum": 10,
     "points_per_super_pacgum": 50,
     "points_per_ghost": 200,
