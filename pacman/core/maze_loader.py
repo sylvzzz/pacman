@@ -102,27 +102,16 @@ def _generate(width: int, height: int, seed: int) -> Any:
     Raises:
         MazeGenerationError: the package raised anything at all.
     """
-    # TODO (you):
-    # 1. generator_class = _load_generator_class().
-    # 2. Inside a try, construct it with KEYWORD arguments:
-    #        generator_class(size=(width, height), perfect=False,
-    #                        seed=seed)
-    #    Keywords, not positions, so a reordered signature in another
-    #    group's build fails loudly instead of silently swapping width
-    #    for height.
-    # 3. except Exception as e -> raise MazeGenerationError from e.
-    #    A broad `except Exception` is right here and nowhere else in
-    #    core: this is third-party code, size=(0, 0) raises a raw
-    #    IndexError from inside it, and you cannot enumerate what a
-    #    package you did not write throws.  Name width, height and seed
-    #    in the message so the failing level is identifiable.
-    # 4. Return the instance.
-    #
-    # Optional, worth considering: the package prints "MazeGenerator
-    # Warning: ..." to stdout.  contextlib.redirect_stdout around the
-    # construction would keep our own output clean.  Your call --
-    # document whichever you choose.
-    raise NotImplementedError("_generate")
+    generator_class = _load_generator_class()
+    try:
+        generator = generator_class(size=(width, height), perfect=False,
+                                    seed=seed)
+    except Exception as e:
+        raise MazeGenerationError(
+            f"the maze generator failed on a {width}x{height} maze "
+            f"with seed {seed}: {e}"
+        ) from e
+    return generator
 
 
 def _read_walls(generator: Any, width: int, height: int) -> list[list[int]]:
@@ -148,19 +137,39 @@ def _read_walls(generator: Any, width: int, height: int) -> list[list[int]]:
         MazeGenerationError: no usable ``maze`` attribute, the wrong
             shape, a ragged row, or a value outside 0..15.
     """
-    # TODO (you):
-    # 1. Read generator.maze inside a try; `except AttributeError` ->
-    #    MazeGenerationError (another group's build may name it
-    #    differently, and that must be a clear message).
-    # 2. Check it is a list of `height` rows -> else MazeGenerationError
-    #    naming both the asked-for and the returned size.
-    # 3. Build the result row by row.  For each row: check it is a list
-    #    of `width` items (a ragged grid is a package bug, not yours),
-    #    and check every item is an int in 0..15 -- remember
-    #    isinstance(True, int) is True, so reject bool here too, exactly
-    #    as _pick_int does.
-    # 4. Return the new grid.
-    raise NotImplementedError("_read_walls")
+    try:
+        raw = generator.maze
+    except AttributeError as e:
+        raise MazeGenerationError(
+            "the maze generator returned an object with no `maze` "
+            "attribute") from e
+    if not isinstance(raw, list):
+        raise MazeGenerationError(
+            f"the maze generator returned a {type(raw).__name__}, "
+            f"expected a list of rows")
+    if len(raw) != height:
+        raise MazeGenerationError(
+            f"asked for a {width}x{height} maze, got {len(raw)} rows")
+    grid: list[list[int]] = []
+    for y, row in enumerate(raw):
+        if not isinstance(row, list):
+            raise MazeGenerationError(
+                f"maze row {y} is a {type(row).__name__}, "
+                f"expected a list")
+        if len(row) != width:
+            raise MazeGenerationError(
+                f"maze row {y} has {len(row)} cells, expected {width}")
+        for x, value in enumerate(row):
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise MazeGenerationError(
+                    f"maze cell ({x}, {y}): expected a whole number, "
+                    f"got {value!r}")
+            if not 0 <= value <= CLOSED_CELL:
+                raise MazeGenerationError(
+                    f"maze cell ({x}, {y}): {value} is not a wall "
+                    f"bitmask in 0..{CLOSED_CELL}")
+        grid.append(list(row))
+    return grid
 
 
 def is_closed(cell: int) -> bool:
@@ -169,8 +178,7 @@ def is_closed(cell: int) -> bool:
     These are the package's "42" glyph cells.  They are not corridors
     and nothing may be carved into or out of them.
     """
-    # TODO (you): one comparison against CLOSED_CELL.
-    raise NotImplementedError("is_closed")
+    return cell == CLOSED_CELL
 
 
 def cells_to_tiles(cells: list[list[int]]) -> list[list[bool]]:
