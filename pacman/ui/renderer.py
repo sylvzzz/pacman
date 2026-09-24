@@ -9,6 +9,7 @@ from pacman.ui.blockfont import Character
 from pacman.ui.log import Logger
 from pacman.ui.maze import Wall, WallStatus, Directions
 from pacman.ui.figures import CreatureType, Creature
+from pacman.core.maze_loader import _generate
 from mazegenerator import MazeGenerator
 import pygame
 import random
@@ -17,9 +18,12 @@ import time
 
 
 class Screen:
-    def __init__(self, width: int, height: int) -> None:
+    def __init__(self, width: int, height: int, seed: int, lvl: list[dict],
+                 points_pacgum: int, points_super: int) -> None:
         self.width = width
         self.height = height
+        self.points_pacgum = points_pacgum
+        self.points_super = points_super
         # pacman colors for easier access
         self.colors = {
             "green":    (50, 200, 50),
@@ -42,11 +46,11 @@ class Screen:
         }
 
         # Create a simple 20x20 maze
-        self.maze_gen = MazeGenerator((20, 20))
-        self.maze_gen.generate()
+        self.current_level = 0
+        mw, mh = lvl[self.current_level].width, lvl[self.current_level].height
+        self.maze_gen = _generate(mw, mh, seed)
         self.maze_width = self.maze_gen._width
         self.maze_height = self.maze_gen._height
-        self.current_level = 1
         self.maze_cells = self._populate_cells(
             random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
         )
@@ -123,13 +127,13 @@ class Screen:
                 )
 
         player_x, player_y = self.maze_gen.maze_entry
-        cells[player_y][player_x] = CreatureType.PLAYER
+        cells[player_x][player_y] = CreatureType.PLAYER
         corners = [
             (0, 0), (0, len(grid[0]) - 1),
             (len(grid) - 1, 0), (len(grid) - 1, len(grid[0]) - 1),
         ]
         for ghost_x, ghost_y in corners:
-            cells[ghost_y][ghost_x] = CreatureType.ENEMY
+            cells[ghost_x][ghost_y] = CreatureType.ENEMY
 
         populated: dict[int, dict[int, CreatureType]] = {}
         for row, row_cells in cells.items():
@@ -145,18 +149,20 @@ class Screen:
 
     @property
     def spawn_point(self) -> tuple[int, int]:
-        """Célula vazia mais próxima do centro do maze."""
         center_x, center_y = self.maze_width // 2, self.maze_height // 2
-        empty_cells = (
+
+        cells = (
             (col, row)
             for row in range(self.maze_height)
             for col in range(self.maze_width)
-            if self.maze_cells[row][col] is CreatureType.EMPTY
+            if self.maze_cells[row][col] is not CreatureType.WALL
         )
+
         return min(
-            empty_cells,
+            cells,
             key=lambda pos: abs(pos[0] - center_x) + abs(pos[1] - center_y),
         )
+
 
     def write_char(self, char: str, screen, size: int, x: int, y: int, color = (255, 255, 0)) -> None:
         block = self.chars.get(char, " ")
@@ -557,10 +563,10 @@ class Screen:
         self.draw_items(self.maze_gen.maze, screen)
 
         if self.maze_cells[self.player_y][self.player_x] == CreatureType.SMALL_GUM:
-            points += 15
+            points += self.points_pacgum
             self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
         elif self.maze_cells[self.player_y][self.player_x] == CreatureType.BIG_GUM:
-            points += 50
+            points += self.points_super
             self.maze_cells[self.player_y][self.player_x] = CreatureType.EMPTY
 
         if direction is not None and self.can_move(direction) is True:
@@ -751,4 +757,4 @@ class Screen:
             selected = menu_idx % len(self.menu_options)
             menu_option = pause_idx % 2
             pygame.display.flip()
-            time.sleep(0.001)
+            time.sleep(0.1)

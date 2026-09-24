@@ -9,8 +9,11 @@ Planned contents: imports pacman.ui.app; parse_arguments() raising UsageError,
 from pacman import ui, core
 
 def main() -> None:
-    game_config = core.load_config("config.json")
-    print(game_config)
+    game = core.load_config("config.json")
+    screen = ui.Screen(game.window_width, game.window_height,
+                       game.seed, game.levels, game.points_per_pacgum, game.points_per_super_pacgum)
+    screen.run()
+    
 
 
 if __name__ == "__main__":
