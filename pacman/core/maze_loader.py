@@ -213,27 +213,32 @@ def cells_to_tiles(cells: list[list[int]]) -> list[list[bool]]:
     Raises:
         MazeGenerationError: *cells* is empty.
     """
-    # TODO (you):
-    # 1. Guard: empty grid (or an empty first row) -> MazeGenerationError.
-    # 2. height = len(cells); width = len(cells[0]).
-    # 3. Start with EVERYTHING solid:
-    #        tiles = [[True] * (2 * width + 1)
-    #                 for _ in range(2 * height + 1)]
-    #    Carving out of a solid block is safer than walling in an empty
-    #    one -- a tile you forget stays a wall, which is survivable; a
-    #    tile you forget the other way is a hole to walk through.
-    # 4. For each cell (cx, cy): if is_closed(cell) -> `continue`,
-    #    leaving its own tile solid too.  Otherwise open its centre:
-    #        tiles[2 * cy + 1][2 * cx + 1] = False
-    # 5. For each (dx, dy, bit) in NEIGHBOURS: carve the tile between
-    #    the two cells only when ALL of these hold:
-    #      - the bit is clear:  not (cell & bit)     <- open, remember
-    #      - the neighbour is inside the grid        <- keeps the border
-    #      - the neighbour is not is_closed(...)     <- keeps 42 sealed
-    #    The tile between them is at
-    #        tiles[2 * cy + 1 + dy][2 * cx + 1 + dx]
-    # 6. Return tiles.
-    raise NotImplementedError("cells_to_tiles")
+    if not cells:
+        raise MazeGenerationError(
+            "the maze generator returned a grid with no rows")
+    if not cells[0]:
+        raise MazeGenerationError(
+            "the maze generator returned rows with no cells in them")
+    height = len(cells)
+    width = len(cells[0])
+    tiles = [[True] * (2 * width + 1)
+             for _ in range(2 * height + 1)]
+    for cy in range(height):
+        for cx in range(width):
+            cell = cells[cy][cx]
+            if is_closed(cell):
+                continue
+            tiles[2 * cy + 1][2 * cx + 1] = False
+            for dx, dy, bit in NEIGHBOURS:
+                if cell & bit:
+                    continue
+                nx, ny = cx + dx, cy + dy
+                if not (0 <= nx < width and 0 <= ny < height):
+                    continue
+                if is_closed(cells[ny][nx]):
+                    continue
+                tiles[2 * cy + 1 + dy][2 * cx + 1 + dx] = False
+    return tiles
 
 
 def generate_tile_grid(width: int, height: int,
@@ -254,8 +259,7 @@ def generate_tile_grid(width: int, height: int,
     Raises:
         MazeGenerationError: any failure, at any stage.
     """
-    # TODO (you): three lines -- _generate(), _read_walls(),
-    # cells_to_tiles().  Every one of them already raises
-    # MazeGenerationError and nothing else, so there is nothing to
-    # catch here.
-    raise NotImplementedError("generate_tile_grid")
+    generator = _generate(width, height, seed)
+    cells = _read_walls(generator, width, height)
+    return cells_to_tiles(cells)
+
