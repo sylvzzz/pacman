@@ -9,3 +9,8 @@ Rebuilding pacman game in python.
 
 ### Menu (So far)
 ![Demo](img/menu.png)
+
+### CHEATS (So far)
+![Demo](img/menu.png)
+
+#### i know yall can look at the code but try to find this menu without doing it :)
