@@ -47,6 +47,7 @@ class Screen:
 
         # Create a simple 20x20 maze
         self.current_level = 0
+        self.cheat_options = ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED", "EXIT"]
         mw, mh = lvl[self.current_level].width, lvl[self.current_level].height
         self.maze_gen = _generate(mw, mh, seed)
         self.maze_width = self.maze_gen._width
@@ -259,8 +260,7 @@ class Screen:
         Increased speed (player moves faster).
         Any other feature that may be useful.
         """
-        cheat_options = ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED"]
-        start_y = (self.height - self.text_height(cheat_options, self.TEXT_SIZE)) // 2
+        start_y = (self.height - self.text_height(self.cheat_options, self.TEXT_SIZE)) // 2
         yellow = self.colors["yellow"]
 
         x = (self.width - self.text_width("CHEAT MENU", self.TEXT_SIZE + 2)) // 2
@@ -268,7 +268,7 @@ class Screen:
 
         start_y += 30
 
-        for i, text in enumerate(cheat_options):
+        for i, text in enumerate(self.cheat_options):
             x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if i == selected:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
@@ -634,13 +634,13 @@ class Screen:
         menu_idx = 0
         cheat_idx = 0
         menu_option = pause_idx % 2
-        cheat_option = cheat_idx % 4
+        cheat_option = cheat_idx % 5
 
 
         self.show_menu(screen, menu_idx)
 
         while running:
-            if direction is not None and playing is True and on_pause is not True:
+            if direction is not None and playing is True and on_pause is not True and cheat_on is not True:
                 points = self.game_loop(screen, direction, points)
             for event in pygame.event.get():
                 at_home_page = True
@@ -725,28 +725,51 @@ class Screen:
 
                     elif playing is True:
                         if cheat_on is True:
+                            if event.key == pygame.K_RETURN:
+                                # ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED", "EXIT"]
+                                if self.cheat_options[cheat_option] == "INVICIBILITY":
+                                    Logger.log(self.cheat_options[cheat_option])
+                                    
+
+                                if self.cheat_options[cheat_option] == "SKIP LEVEL":
+                                    Logger.log(self.cheat_options[cheat_option])
+                                    
+                                        
+                                if self.cheat_options[cheat_option] == "FREEZE GHOSTS":
+                                    Logger.log(self.cheat_options[cheat_option])
+
+                                if self.cheat_options[cheat_option] == "2x SPEED":
+                                    Logger.log(self.cheat_options[cheat_option])
+
+                                if self.cheat_options[cheat_option] == "EXIT":
+                                    Logger.log(self.cheat_options[cheat_option])
+                                    cheat_on = False
+                                    self.clear(screen)
+                                    self.game_loop(screen, direction, points)
+
                             if event.key == pygame.K_UP:
                                 cheat_idx -= 1
-                                cheat_option = cheat_idx % 4
+                                cheat_option = cheat_idx % 5
                                 self.game_loop(screen, None, points)
                                 self.tinted_window(screen)
                                 self.cheat_menu(screen, cheat_option)
                             if event.key == pygame.K_DOWN:
                                 cheat_idx += 1
-                                cheat_option = cheat_idx % 4
+                                cheat_option = cheat_idx % 5
                                 self.game_loop(screen, None, points)
                                 self.tinted_window(screen)
                                 self.cheat_menu(screen, cheat_option)
-                        if pressed_first_cheat is False and event.key == pygame.K_4:
+                        if pressed_first_cheat is False and event.key == pygame.K_4 and cheat_on is not True:
                             pressed_first_cheat = True
-                        if pressed_first_cheat is True and event.key == pygame.K_2:
+                        elif pressed_first_cheat is True and event.key == pygame.K_2:
+                            pressed_first_cheat = False
                             cheat_on = True
-                            cheat_option = cheat_idx % 4
+                            cheat_option = cheat_idx % 5
                             self.game_loop(screen, None, points)
                             self.tinted_window(screen)
                             self.cheat_menu(screen, cheat_option)
                         elif pressed_first_cheat is True and event.key != pygame.K_2:
-                            continue
+                            pressed_first_cheat = False
                         if on_pause is True:
                             if event.key == pygame.K_UP:
                                 pause_idx -= 1
@@ -792,22 +815,22 @@ class Screen:
                             playing = True
 
                         if event.key == pygame.K_UP and self.player_y > 0:
-                            if self.can_move(Directions.NORTH) is True and on_pause is not True:
+                            if self.can_move(Directions.NORTH) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.NORTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_DOWN and self.player_y < len(self.maze_gen.maze) - 1:
-                            if self.can_move(Directions.SOUTH) is True and on_pause is not True:
+                            if self.can_move(Directions.SOUTH) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.SOUTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_LEFT and self.player_x > 0:
-                            if self.can_move(Directions.WEST) is True and on_pause is not True:
+                            if self.can_move(Directions.WEST) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.WEST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_RIGHT and self.player_x < len(self.maze_gen.maze[0]) - 1:
-                            if self.can_move(Directions.EAST) is True and on_pause is not True:
+                            if self.can_move(Directions.EAST) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.EAST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
