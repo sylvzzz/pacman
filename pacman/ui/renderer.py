@@ -112,6 +112,13 @@ class Screen:
             pygame.K_9:   "9",
         }
 
+        self.cheats_activated = {
+            "INVICIBILITY": False,
+            "SKIP LEVEL": False,
+            "FREEZE GHOSTS": False,
+            "2x SPEED": False,
+        }
+
     def _populate_cells(
         self, seed: random.Random, density: float
     ) -> dict[int, dict[int, CreatureType]]:
@@ -269,12 +276,20 @@ class Screen:
         start_y += 30
 
         for i, text in enumerate(self.cheat_options):
-            x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+            if text != "EXIT":
+                activated = "ON" if self.cheats_activated[text] is True else "OFF"
+                toggle_color = self.colors["red"] if activated == "OFF" else self.colors["green"]
+                x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+            else:
+                x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if i == selected:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
                 self.write("_" * len(text), screen, x, start_y + (i + 0.1) * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
+            if text != "EXIT":
+                x = self.width - self.width  // 4
+                self.write(activated, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, toggle_color)
 
     def show_instructions(self, screen) -> None:
         lines = []
@@ -298,8 +313,8 @@ class Screen:
         tone = (1, 1, 1)
 
         # THIS HAMMERS THE H*LL OUTTA CPU, fixed it by using // 5 instead of whole screen
-        for x in range(self.width // 4, self.width - self.width // 5, step):
-            for y in range(self.height // 4, self.height - self.height // 4, step):
+        for x in range(self.width // 5, self.width - self.width // 5, step):
+            for y in range(self.height // 5, self.height - self.height // 5, step):
                 color = screen.get_at((x, y))
                 r = min(255, (color[0] >> dark_rate) + tone[0])
                 g = min(255, (color[1] >> dark_rate) + tone[1])
@@ -728,18 +743,39 @@ class Screen:
                             if event.key == pygame.K_RETURN:
                                 # ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED", "EXIT"]
                                 if self.cheat_options[cheat_option] == "INVICIBILITY":
-                                    Logger.log(self.cheat_options[cheat_option])
-                                    
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
 
                                 if self.cheat_options[cheat_option] == "SKIP LEVEL":
-                                    Logger.log(self.cheat_options[cheat_option])
-                                    
-                                        
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
                                 if self.cheat_options[cheat_option] == "FREEZE GHOSTS":
-                                    Logger.log(self.cheat_options[cheat_option])
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
 
                                 if self.cheat_options[cheat_option] == "2x SPEED":
-                                    Logger.log(self.cheat_options[cheat_option])
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
 
                                 if self.cheat_options[cheat_option] == "EXIT":
                                     Logger.log(self.cheat_options[cheat_option])
