@@ -644,6 +644,11 @@ class Screen:
 
     def winner_screen(self, screen) -> None:
         size = self.TEXT_SIZE + 2
+        glyph_width = len(self.chars["$"][0]) * size  # solution for centering that wasnt being show right
+        x = self.width // 2 - glyph_width // 2
+
+        self.write_char("$", screen, size, x, self.height // 10, self.colors["yellow"])
+
         step = self.LETTER_W * size + 2
 
         text = "CONGRATULATIONS - YOU WON!"
@@ -657,12 +662,13 @@ class Screen:
             x += step
 
         second_text = "Press space to go to the menu..."
-        start_y += 70
+        size = self.TEXT_SIZE
+        start_y += 100
         x = (self.width - len(second_text) * step) // 2
 
         for i, char in enumerate(second_text):
             color = colors[i % len(colors)]
-            self.write_char(char, screen, size, x, start_y, color)
+            self.write_char(char, screen, size, x, start_y, self.colors["white"])
             x += step
 
     def game_over(self, screen) -> None:
