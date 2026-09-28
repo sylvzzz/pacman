@@ -9,15 +9,15 @@ Planned contents: imports pacman.ui.app; parse_arguments() raising UsageError,
 from pacman import ui, core
 
 def main() -> None:
-    import pygame
+    """import pygame
 
     pygame.init()
     display_info = pygame.display.Info()
 
-    adapteted_x, adaptated_y = display_info.current_h // 2, display_info.current_h // 2
+    adapteted_x, adaptated_y = display_info.current_h // 2, display_info.current_h // 2"""
 
     game = core.load_config("config.json")
-    screen = ui.Screen(adapteted_x, adaptated_y, 
+    screen = ui.Screen(game.window_width, game.window_height, 
                        game.seed, game.levels, game.points_per_pacgum, game.points_per_super_pacgum)
     screen.run()
     

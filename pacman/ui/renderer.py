@@ -643,26 +643,27 @@ class Screen:
         )
 
     def winner_screen(self, screen) -> None:
+        size = self.TEXT_SIZE + 2
+        step = self.LETTER_W * size + 2
+
         text = "CONGRATULATIONS - YOU WON!"
         start_y = self.height // 2
-        x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+        x = (self.width - len(text) * step) // 2
 
         colors = list(self.colors.values())
         for i, char in enumerate(text):
             color = colors[i % len(colors)]
-            self.write_char(char, screen, self.TEXT_SIZE, x, start_y, color)
-            x += self.LETTER_W * self.TEXT_SIZE + 5
+            self.write_char(char, screen, size, x, start_y, color)
+            x += step
 
-
-        second_text = "Press space to go to the main menu..."
-
+        second_text = "Press space to go to the menu..."
         start_y += 70
-        x = (self.width - self.text_width(second_text, self.TEXT_SIZE)) // 2
-        
+        x = (self.width - len(second_text) * step) // 2
+
         for i, char in enumerate(second_text):
             color = colors[i % len(colors)]
-            self.write_char(char, screen, self.TEXT_SIZE, x, start_y, color)
-            x += self.LETTER_W * self.TEXT_SIZE + 5
+            self.write_char(char, screen, size, x, start_y, color)
+            x += step
 
 
     def run(self) -> None:
@@ -750,16 +751,16 @@ class Screen:
                         running = False
 
                     elif event.key == pygame.K_DOWN and not playing:
-                        if menu_idx < len(self.menu_options) - 1:
                             menu_idx += 1
+                            selected = menu_idx % len(self.menu_options)
                             self.clear(screen)
-                            self.show_menu(screen, menu_idx)
+                            self.show_menu(screen, selected)
 
                     elif event.key == pygame.K_UP and not playing:
-                        if menu_idx > 0:
                             menu_idx -= 1
+                            selected = menu_idx % len(self.menu_options)
                             self.clear(screen)
-                            self.show_menu(screen, menu_idx)
+                            self.show_menu(screen, selected)
 
                     elif event.key == pygame.K_RETURN and playing is not True:
                         Logger.log(self.menu_options[selected])
@@ -929,6 +930,5 @@ class Screen:
 
                         # Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
-            selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
             time.sleep(0.001)
