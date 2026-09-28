@@ -1,12 +1,14 @@
 Welcome to Pac-Man
 Made by dbotelho and dbaltaza at 42 Lisbon
 
-======== MENU =======
+          MENU
+-----------------------------
 Enter - Select menu option
 Arrow Up/Down - Move between options
 Arrow Left - Go back
 
-======== GAME =======
+          GAME
+-----------------------------
 Arrow Up/Down/Left/Right - Movement
 ********* - CHEAT MENU
 ESC - Pause menu

@@ -210,13 +210,17 @@ class Screen:
         start_y = (self.height - self.text_height(self.menu_options, self.TEXT_SIZE)) // 2
         yellow = self.colors["yellow"]
 
-        x = (self.width - self.text_width("Enter your name:", self.TEXT_SIZE + 2)) // 2
+        x = (self.width - self.text_width("Enter your name", self.TEXT_SIZE + 2)) // 2
         self.write("Enter your name:", screen, x, start_y - 20 - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
 
         start_y += 30
 
-        x = (self.width - self.text_width(name + "_", self.TEXT_SIZE)) // 2
-        self.write(name + "_", screen, x, start_y + 2 * self.LINE_SPACING, self.TEXT_SIZE, self.colors["cyan"])
+        if len(name) < 10:
+            x = (self.width - self.text_width(name + "_", self.TEXT_SIZE)) // 2
+            self.write(name + "_", screen, x, start_y + 2 * self.LINE_SPACING, self.TEXT_SIZE, self.colors["cyan"])
+        else:
+            x = (self.width - self.text_width(name, self.TEXT_SIZE)) // 2
+            self.write(name, screen, x, start_y + 2 * self.LINE_SPACING, self.TEXT_SIZE, self.colors["cyan"])
 
     def valid_name(self, text: str) -> bool:
         if not text:
