@@ -31,7 +31,7 @@ class Screen:
             "red":      (220, 50, 50),
             "orange":   (255, 165, 0),
             "purple":   (180, 50, 180),
-            "black":    (0, 0, 0),
+            # "black":    (0, 0, 0),
             "white":    (255, 255, 255),
             "brown":    (139, 69, 19),   # rgb colors
             "maroon":   (128, 0, 0),
@@ -48,14 +48,17 @@ class Screen:
         # Create a simple 20x20 maze
         self.current_level = 0
         self.cheat_options = ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED", "EXIT"]
-        mw, mh = lvl[self.current_level].width, lvl[self.current_level].height
-        self.maze_gen = _generate(mw, mh, seed)
-        self.maze_width = self.maze_gen._width
-        self.maze_height = self.maze_gen._height
+        self.levels = lvl
+        self.seed = seed
+        self.mw, self.mh = lvl[self.current_level].width, lvl[self.current_level].height
+        self.maze_gen = _generate(self.mw, self.mh, self.seed)
         self.maze_cells = self._populate_cells(
             random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
         )
-    
+
+        self.maze_width = self.maze_gen._width
+        self.maze_height = self.maze_gen._height
+
         self.player_x = self.spawn_point[0]
         self.player_y = self.spawn_point[1]
 
@@ -629,6 +632,39 @@ class Screen:
     def clear(self, screen):
         screen.fill((0,0,0))
 
+    def next_level(self) -> None:
+        self.current_level += 1
+        self.mw, self.mh = self.levels[self.current_level].width, self.levels[self.current_level].height
+        self.maze_gen = _generate(self.mw, self.mh, self.seed)
+        self.maze_width = self.maze_gen._width
+        self.maze_height = self.maze_gen._height
+        self.maze_cells = self._populate_cells(
+            random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
+        )
+
+    def winner_screen(self, screen) -> None:
+        text = "CONGRATULATIONS - YOU WON!"
+        start_y = self.height // 2
+        x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+
+        colors = list(self.colors.values())
+        for i, char in enumerate(text):
+            color = colors[i % len(colors)]
+            self.write_char(char, screen, self.TEXT_SIZE, x, start_y, color)
+            x += self.LETTER_W * self.TEXT_SIZE + 5
+
+
+        second_text = "Press space to go to the main menu..."
+
+        start_y += 70
+        x = (self.width - self.text_width(second_text, self.TEXT_SIZE)) // 2
+        
+        for i, char in enumerate(second_text):
+            color = colors[i % len(colors)]
+            self.write_char(char, screen, self.TEXT_SIZE, x, start_y, color)
+            x += self.LETTER_W * self.TEXT_SIZE + 5
+
+
     def run(self) -> None:
 
         pygame.init()
@@ -672,6 +708,16 @@ class Screen:
                                     "name": name,
                                     "points": 0
                                 }
+                                self.current_level = 0
+
+                                self.mw, self.mh = self.levels[self.current_level].width, self.levels[self.current_level].height
+                                self.maze_gen = _generate(self.mw, self.mh, self.seed)
+                                self.maze_width = self.maze_gen._width
+                                self.maze_height = self.maze_gen._height
+                                self.maze_cells = self._populate_cells(
+                                    random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
+                                )
+                        
 
                                 self.save_player(name, points)
                                 screen.fill((0, 0, 0))
@@ -823,6 +869,7 @@ class Screen:
                             self.game_loop(screen, direction, points)
                             on_pause = False
                         elif event.key == pygame.K_RETURN and on_pause is True and menu_option == 1:
+                            self.current_level = 0
                             screen.fill((0, 0, 0))
                             self.show_menu(screen, 0)
                             on_pause = False
@@ -838,17 +885,27 @@ class Screen:
                             self.maze_gen.generate()
                             self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
                             playing = True
-                        if event.key == pygame.K_n:
+                        if event.key == pygame.K_n and self.current_level < len(self.levels):
+                            try:
+                                self.next_level()
+                                screen.fill((0, 0, 0))
+                                self.maze_gen.generate()
+                                self.draw_items(self.maze_gen.maze, screen)
+                                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                                playing = True
+                            except IndexError:
+                                self.tinted_window(screen)
+                                self.winner_screen(screen)
+                                playing = True
+
+                        if self.current_level == len(self.levels) and event.key == pygame.K_SPACE:
+                            self.current_level = 0
                             screen.fill((0, 0, 0))
-                            self.maze_gen.generate()
-                            self.current_level += 1
-                            self.maze_cells = self._populate_cells(
-                                random.Random(self.current_level),
-                                max(1 - (self.current_level * 0.3), 0.3),
-                            )
-                            self.draw_items(self.maze_gen.maze, screen)
-                            self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-                            playing = True
+                            self.show_menu(screen, 0)
+                            on_pause = False
+                            playing = False
+                            direction = None
+
 
                         if event.key == pygame.K_UP and self.player_y > 0:
                             if self.can_move(Directions.NORTH) is True and on_pause is not True and cheat_on is not True:
