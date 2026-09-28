@@ -665,6 +665,25 @@ class Screen:
             self.write_char(char, screen, size, x, start_y, color)
             x += step
 
+    def game_over(self, screen) -> None:
+            size = self.TEXT_SIZE + 2
+            step = self.LETTER_W * size + 2
+    
+            text = "GAME OVER"
+            start_y = self.height // 2
+            x = (self.width - len(text) * step) // 2
+            for char in text:
+                self.write_char(char, screen, size, x, start_y, self.colors["red"])
+                x += step
+    
+            second_text = "Press space to go to the menu..."
+            start_y += 70
+            x = (self.width - len(second_text) * step) // 2
+    
+            for char in second_text:
+                self.write_char(char, screen, size, x, start_y, self.colors["red"])
+                x += step
+
 
     def run(self) -> None:
 
@@ -687,6 +706,7 @@ class Screen:
         cheat_idx = 0
         menu_option = pause_idx % 2
         cheat_option = cheat_idx % 5
+        selected = menu_idx % len(self.menu_options)
 
 
         self.show_menu(screen, menu_idx)
