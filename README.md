@@ -10,6 +10,9 @@ Rebuilding the Pac-Man game in Python, on procedurally generated mazes.
 ### Menu (so far)
 ![Menu](img/menu.png)
 
+### Cheats (so far)
+![Cheats](img/cheat.png)
+
 ## Description
 
 A Pac-Man clone written in Python 3.10+ with pygame-ce. Every level is a

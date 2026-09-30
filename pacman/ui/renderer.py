@@ -31,7 +31,7 @@ class Screen:
             "red":      (220, 50, 50),
             "orange":   (255, 165, 0),
             "purple":   (180, 50, 180),
-            "black":    (0, 0, 0),
+            # "black":    (0, 0, 0),
             "white":    (255, 255, 255),
             "brown":    (139, 69, 19),   # rgb colors
             "maroon":   (128, 0, 0),
@@ -47,14 +47,18 @@ class Screen:
 
         # Create a simple 20x20 maze
         self.current_level = 0
-        mw, mh = lvl[self.current_level].width, lvl[self.current_level].height
-        self.maze_gen = _generate(mw, mh, seed)
-        self.maze_width = self.maze_gen._width
-        self.maze_height = self.maze_gen._height
+        self.cheat_options = ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED", "EXIT"]
+        self.levels = lvl
+        self.seed = seed
+        self.mw, self.mh = lvl[self.current_level].width, lvl[self.current_level].height
+        self.maze_gen = _generate(self.mw, self.mh, self.seed)
         self.maze_cells = self._populate_cells(
             random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
         )
-    
+
+        self.maze_width = self.maze_gen._width
+        self.maze_height = self.maze_gen._height
+
         self.player_x = self.spawn_point[0]
         self.player_y = self.spawn_point[1]
 
@@ -109,6 +113,13 @@ class Screen:
             pygame.K_7:   "7",
             pygame.K_8:   "8",
             pygame.K_9:   "9",
+        }
+
+        self.cheats_activated = {
+            "INVICIBILITY": False,
+            "SKIP LEVEL": False,
+            "FREEZE GHOSTS": False,
+            "2x SPEED": False,
         }
 
     def _populate_cells(
@@ -199,13 +210,17 @@ class Screen:
         start_y = (self.height - self.text_height(self.menu_options, self.TEXT_SIZE)) // 2
         yellow = self.colors["yellow"]
 
-        x = (self.width - self.text_width("Enter your name:", self.TEXT_SIZE + 2)) // 2
+        x = (self.width - self.text_width("Enter your name", self.TEXT_SIZE + 2)) // 2
         self.write("Enter your name:", screen, x, start_y - 20 - self.LINE_SPACING, self.TEXT_SIZE + 2, yellow)
 
         start_y += 30
 
-        x = (self.width - self.text_width(name + "_", self.TEXT_SIZE)) // 2
-        self.write(name + "_", screen, x, start_y + 2 * self.LINE_SPACING, self.TEXT_SIZE, self.colors["cyan"])
+        if len(name) < 10:
+            x = (self.width - self.text_width(name + "_", self.TEXT_SIZE)) // 2
+            self.write(name + "_", screen, x, start_y + 2 * self.LINE_SPACING, self.TEXT_SIZE, self.colors["cyan"])
+        else:
+            x = (self.width - self.text_width(name, self.TEXT_SIZE)) // 2
+            self.write(name, screen, x, start_y + 2 * self.LINE_SPACING, self.TEXT_SIZE, self.colors["cyan"])
 
     def valid_name(self, text: str) -> bool:
         if not text:
@@ -259,8 +274,7 @@ class Screen:
         Increased speed (player moves faster).
         Any other feature that may be useful.
         """
-        cheat_options = ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED"]
-        start_y = (self.height - self.text_height(cheat_options, self.TEXT_SIZE)) // 2
+        start_y = (self.height - self.text_height(self.cheat_options, self.TEXT_SIZE)) // 2
         yellow = self.colors["yellow"]
 
         x = (self.width - self.text_width("CHEAT MENU", self.TEXT_SIZE + 2)) // 2
@@ -268,13 +282,21 @@ class Screen:
 
         start_y += 30
 
-        for i, text in enumerate(cheat_options):
-            x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+        for i, text in enumerate(self.cheat_options):
+            if text != "EXIT":
+                activated = "ON" if self.cheats_activated[text] is True else "OFF"
+                toggle_color = self.colors["red"] if activated == "OFF" else self.colors["green"]
+                x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
+            else:
+                x = (self.width - self.text_width(text, self.TEXT_SIZE)) // 2
             if i == selected:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
                 self.write("_" * len(text), screen, x, start_y + (i + 0.1) * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
             else:
                 self.write(text, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, yellow)
+            if text != "EXIT":
+                x = self.width - self.width  // 4
+                self.write(activated, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, toggle_color)
 
     def show_instructions(self, screen) -> None:
         lines = []
@@ -298,8 +320,8 @@ class Screen:
         tone = (1, 1, 1)
 
         # THIS HAMMERS THE H*LL OUTTA CPU, fixed it by using // 5 instead of whole screen
-        for x in range(self.width // 4, self.width - self.width // 5, step):
-            for y in range(self.height // 4, self.height - self.height // 4, step):
+        for x in range(self.width // 5, self.width - self.width // 5, step):
+            for y in range(self.height // 5, self.height - self.height // 5, step):
                 color = screen.get_at((x, y))
                 r = min(255, (color[0] >> dark_rate) + tone[0])
                 g = min(255, (color[1] >> dark_rate) + tone[1])
@@ -614,6 +636,65 @@ class Screen:
     def clear(self, screen):
         screen.fill((0,0,0))
 
+    def next_level(self) -> None:
+        self.current_level += 1
+        self.mw, self.mh = self.levels[self.current_level].width, self.levels[self.current_level].height
+        self.maze_gen = _generate(self.mw, self.mh, self.seed)
+        self.maze_width = self.maze_gen._width
+        self.maze_height = self.maze_gen._height
+        self.maze_cells = self._populate_cells(
+            random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
+        )
+
+    def winner_screen(self, screen) -> None:
+        size = self.TEXT_SIZE + 2
+        glyph_width = len(self.chars["$"][0]) * size  # solution for centering that wasnt being show right
+        x = self.width // 2 - glyph_width // 2
+
+        self.write_char("$", screen, size, x, self.height // 10, self.colors["yellow"])
+
+        step = self.LETTER_W * size + 2
+
+        text = "CONGRATULATIONS - YOU WON!"
+        start_y = self.height // 2
+        x = (self.width - len(text) * step) // 2
+
+        colors = list(self.colors.values())
+        for i, char in enumerate(text):
+            color = colors[i % len(colors)]
+            self.write_char(char, screen, size, x, start_y, color)
+            x += step
+
+        second_text = "Press space to go to the menu..."
+        size = self.TEXT_SIZE
+        start_y += 100
+        x = (self.width - len(second_text) * step) // 2
+
+        for i, char in enumerate(second_text):
+            color = colors[i % len(colors)]
+            self.write_char(char, screen, size, x, start_y, self.colors["white"])
+            x += step
+
+    def game_over(self, screen) -> None:
+            size = self.TEXT_SIZE + 2
+            step = self.LETTER_W * size + 2
+    
+            text = "GAME OVER"
+            start_y = self.height // 2
+            x = (self.width - len(text) * step) // 2
+            for char in text:
+                self.write_char(char, screen, size, x, start_y, self.colors["red"])
+                x += step
+    
+            second_text = "Press space to go to the menu..."
+            start_y += 70
+            x = (self.width - len(second_text) * step) // 2
+    
+            for char in second_text:
+                self.write_char(char, screen, size, x, start_y, self.colors["red"])
+                x += step
+
+
     def run(self) -> None:
 
         pygame.init()
@@ -634,13 +715,14 @@ class Screen:
         menu_idx = 0
         cheat_idx = 0
         menu_option = pause_idx % 2
-        cheat_option = cheat_idx % 4
+        cheat_option = cheat_idx % 5
+        selected = menu_idx % len(self.menu_options)
 
 
         self.show_menu(screen, menu_idx)
 
         while running:
-            if direction is not None and playing is True and on_pause is not True:
+            if direction is not None and playing is True and on_pause is not True and cheat_on is not True:
                 points = self.game_loop(screen, direction, points)
             for event in pygame.event.get():
                 at_home_page = True
@@ -657,6 +739,16 @@ class Screen:
                                     "name": name,
                                     "points": 0
                                 }
+                                self.current_level = 0
+
+                                self.mw, self.mh = self.levels[self.current_level].width, self.levels[self.current_level].height
+                                self.maze_gen = _generate(self.mw, self.mh, self.seed)
+                                self.maze_width = self.maze_gen._width
+                                self.maze_height = self.maze_gen._height
+                                self.maze_cells = self._populate_cells(
+                                    random.Random(1), max(1 - (self.current_level * 0.1), 0.1)
+                                )
+                        
 
                                 self.save_player(name, points)
                                 screen.fill((0, 0, 0))
@@ -689,16 +781,16 @@ class Screen:
                         running = False
 
                     elif event.key == pygame.K_DOWN and not playing:
-                        if menu_idx < len(self.menu_options) - 1:
                             menu_idx += 1
+                            selected = menu_idx % len(self.menu_options)
                             self.clear(screen)
-                            self.show_menu(screen, menu_idx)
+                            self.show_menu(screen, selected)
 
                     elif event.key == pygame.K_UP and not playing:
-                        if menu_idx > 0:
                             menu_idx -= 1
+                            selected = menu_idx % len(self.menu_options)
                             self.clear(screen)
-                            self.show_menu(screen, menu_idx)
+                            self.show_menu(screen, selected)
 
                     elif event.key == pygame.K_RETURN and playing is not True:
                         Logger.log(self.menu_options[selected])
@@ -725,28 +817,72 @@ class Screen:
 
                     elif playing is True:
                         if cheat_on is True:
+                            if event.key == pygame.K_RETURN:
+                                # ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED", "EXIT"]
+                                if self.cheat_options[cheat_option] == "INVICIBILITY":
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
+
+                                if self.cheat_options[cheat_option] == "SKIP LEVEL":
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
+                                if self.cheat_options[cheat_option] == "FREEZE GHOSTS":
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
+
+                                if self.cheat_options[cheat_option] == "2x SPEED":
+                                    if self.cheats_activated[self.cheat_options[cheat_option]] is True:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = False
+                                    else:
+                                        self.cheats_activated[self.cheat_options[cheat_option]] = True
+                                    self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)
+                                    self.cheat_menu(screen, cheat_option)
+
+                                if self.cheat_options[cheat_option] == "EXIT":
+                                    Logger.log(self.cheat_options[cheat_option])
+                                    cheat_on = False
+                                    self.clear(screen)
+                                    self.game_loop(screen, direction, points)
+
                             if event.key == pygame.K_UP:
                                 cheat_idx -= 1
-                                cheat_option = cheat_idx % 4
+                                cheat_option = cheat_idx % 5
                                 self.game_loop(screen, None, points)
                                 self.tinted_window(screen)
                                 self.cheat_menu(screen, cheat_option)
                             if event.key == pygame.K_DOWN:
                                 cheat_idx += 1
-                                cheat_option = cheat_idx % 4
+                                cheat_option = cheat_idx % 5
                                 self.game_loop(screen, None, points)
                                 self.tinted_window(screen)
                                 self.cheat_menu(screen, cheat_option)
-                        if pressed_first_cheat is False and event.key == pygame.K_4:
+                        if pressed_first_cheat is False and event.key == pygame.K_4 and cheat_on is not True:
                             pressed_first_cheat = True
-                        if pressed_first_cheat is True and event.key == pygame.K_2:
+                        elif pressed_first_cheat is True and event.key == pygame.K_2:
+                            pressed_first_cheat = False
                             cheat_on = True
-                            cheat_option = cheat_idx % 4
+                            cheat_option = cheat_idx % 5
                             self.game_loop(screen, None, points)
                             self.tinted_window(screen)
                             self.cheat_menu(screen, cheat_option)
                         elif pressed_first_cheat is True and event.key != pygame.K_2:
-                            continue
+                            pressed_first_cheat = False
                         if on_pause is True:
                             if event.key == pygame.K_UP:
                                 pause_idx -= 1
@@ -764,6 +900,7 @@ class Screen:
                             self.game_loop(screen, direction, points)
                             on_pause = False
                         elif event.key == pygame.K_RETURN and on_pause is True and menu_option == 1:
+                            self.current_level = 0
                             screen.fill((0, 0, 0))
                             self.show_menu(screen, 0)
                             on_pause = False
@@ -779,40 +916,49 @@ class Screen:
                             self.maze_gen.generate()
                             self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
                             playing = True
-                        if event.key == pygame.K_n:
+                        if event.key == pygame.K_n and self.current_level < len(self.levels):
+                            try:
+                                self.next_level()
+                                screen.fill((0, 0, 0))
+                                self.maze_gen.generate()
+                                self.draw_items(self.maze_gen.maze, screen)
+                                self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
+                                playing = True
+                            except IndexError:
+                                self.tinted_window(screen)
+                                self.winner_screen(screen)
+                                playing = True
+
+                        if self.current_level == len(self.levels) and event.key == pygame.K_SPACE:
+                            self.current_level = 0
                             screen.fill((0, 0, 0))
-                            self.maze_gen.generate()
-                            self.current_level += 1
-                            self.maze_cells = self._populate_cells(
-                                random.Random(self.current_level),
-                                max(1 - (self.current_level * 0.3), 0.3),
-                            )
-                            self.draw_items(self.maze_gen.maze, screen)
-                            self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
-                            playing = True
+                            self.show_menu(screen, 0)
+                            on_pause = False
+                            playing = False
+                            direction = None
+
 
                         if event.key == pygame.K_UP and self.player_y > 0:
-                            if self.can_move(Directions.NORTH) is True and on_pause is not True:
+                            if self.can_move(Directions.NORTH) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.NORTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_DOWN and self.player_y < len(self.maze_gen.maze) - 1:
-                            if self.can_move(Directions.SOUTH) is True and on_pause is not True:
+                            if self.can_move(Directions.SOUTH) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.SOUTH
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_LEFT and self.player_x > 0:
-                            if self.can_move(Directions.WEST) is True and on_pause is not True:
+                            if self.can_move(Directions.WEST) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.WEST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         if event.key == pygame.K_RIGHT and self.player_x < len(self.maze_gen.maze[0]) - 1:
-                            if self.can_move(Directions.EAST) is True and on_pause is not True:
+                            if self.can_move(Directions.EAST) is True and on_pause is not True and cheat_on is not True:
                                 direction = Directions.EAST
                                 # self.move_creatures(self.maze_gen.maze, screen, self.player_x, self.player_y)
 
                         # Logger.log(f"X: {self.player_x}, Y: {self.player_y}")
 
-            selected = menu_idx % len(self.menu_options)
             pygame.display.flip()
             time.sleep(0.001)
