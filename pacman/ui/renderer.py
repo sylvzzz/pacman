@@ -824,8 +824,9 @@ class Screen:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = False
                                     else:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = True
-                                    self.game_loop(screen, None, points)
-                                    self.tinted_window(screen)
+                                    """self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)"""  # for perfomance purposes this will not be used for now
+                                    self.clear(screen)
                                     self.cheat_menu(screen, cheat_option)
 
                                 if self.cheat_options[cheat_option] == "SKIP LEVEL":
@@ -833,16 +834,18 @@ class Screen:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = False
                                     else:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = True
-                                    self.game_loop(screen, None, points)
-                                    self.tinted_window(screen)
+                                    """self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                                    self.clear(screen)
                                     self.cheat_menu(screen, cheat_option)
                                 if self.cheat_options[cheat_option] == "FREEZE GHOSTS":
                                     if self.cheats_activated[self.cheat_options[cheat_option]] is True:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = False
                                     else:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = True
-                                    self.game_loop(screen, None, points)
-                                    self.tinted_window(screen)
+                                    """self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                                    self.clear(screen)
                                     self.cheat_menu(screen, cheat_option)
 
                                 if self.cheat_options[cheat_option] == "2x SPEED":
@@ -850,8 +853,9 @@ class Screen:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = False
                                     else:
                                         self.cheats_activated[self.cheat_options[cheat_option]] = True
-                                    self.game_loop(screen, None, points)
-                                    self.tinted_window(screen)
+                                    """self.game_loop(screen, None, points)
+                                    self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                                    self.clear(screen)
                                     self.cheat_menu(screen, cheat_option)
 
                                 if self.cheat_options[cheat_option] == "EXIT":
@@ -863,14 +867,16 @@ class Screen:
                             if event.key == pygame.K_UP:
                                 cheat_idx -= 1
                                 cheat_option = cheat_idx % 5
-                                self.game_loop(screen, None, points)
-                                self.tinted_window(screen)
+                                """self.game_loop(screen, None, points)
+                                self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                                self.clear(screen)
                                 self.cheat_menu(screen, cheat_option)
                             if event.key == pygame.K_DOWN:
                                 cheat_idx += 1
                                 cheat_option = cheat_idx % 5
-                                self.game_loop(screen, None, points)
-                                self.tinted_window(screen)
+                                """self.game_loop(screen, None, points)
+                                self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                                self.clear(screen)
                                 self.cheat_menu(screen, cheat_option)
                         if pressed_first_cheat is False and event.key == pygame.K_4 and cheat_on is not True:
                             pressed_first_cheat = True
@@ -878,8 +884,10 @@ class Screen:
                             pressed_first_cheat = False
                             cheat_on = True
                             cheat_option = cheat_idx % 5
-                            self.game_loop(screen, None, points)
-                            self.tinted_window(screen)
+                            """self.game_loop(screen, None, points)
+                            self.tinted_window(screen)"""
+                            # for perfomance purposes this will not be used for now
+                            self.clear(screen)
                             self.cheat_menu(screen, cheat_option)
                         elif pressed_first_cheat is True and event.key != pygame.K_2:
                             pressed_first_cheat = False
@@ -887,27 +895,30 @@ class Screen:
                             if event.key == pygame.K_UP:
                                 pause_idx -= 1
                                 menu_option = pause_idx % 2
-                                self.game_loop(screen, None, points)
-                                self.tinted_window(screen)
+                                """self.game_loop(screen, None, points)
+                                self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                                self.clear(screen)
                                 self.pause_menu(screen, menu_option)
                             if event.key == pygame.K_DOWN:
                                 pause_idx += 1
                                 menu_option = pause_idx % 2
-                                self.game_loop(screen, None, points)
-                                self.tinted_window(screen)
+                                """self.game_loop(screen, None, points)
+                                self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                                self.clear(screen)
                                 self.pause_menu(screen, menu_option)
                         if event.key == pygame.K_RETURN and on_pause is True and menu_option == 0:
                             self.game_loop(screen, direction, points)
                             on_pause = False
                         elif event.key == pygame.K_RETURN and on_pause is True and menu_option == 1:
                             self.current_level = 0
-                            screen.fill((0, 0, 0))
+                            self.clear(screen)
                             self.show_menu(screen, 0)
                             on_pause = False
                             playing = False
                             direction = None
                         elif event.key == pygame.K_ESCAPE and on_pause is False:
-                            self.tinted_window(screen)
+                            """self.tinted_window(screen)""" # for perfomance purposes this will not be used for now
+                            self.clear(screen)
                             self.pause_menu(screen, menu_option)
                             on_pause = True
 
@@ -919,7 +930,7 @@ class Screen:
                         if event.key == pygame.K_n and self.current_level < len(self.levels):
                             try:
                                 self.next_level()
-                                screen.fill((0, 0, 0))
+                                self.clear(screen)
                                 self.maze_gen.generate()
                                 self.draw_items(self.maze_gen.maze, screen)
                                 self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
@@ -931,7 +942,7 @@ class Screen:
 
                         if self.current_level == len(self.levels) and event.key == pygame.K_SPACE:
                             self.current_level = 0
-                            screen.fill((0, 0, 0))
+                            self.clear(screen)
                             self.show_menu(screen, 0)
                             on_pause = False
                             playing = False
