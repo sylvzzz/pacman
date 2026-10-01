@@ -23,8 +23,10 @@ Three rules that are easy to get wrong and expensive to debug:
 """
 
 import random
+from collections import deque
 
 from .config import LevelSpec
+from .maze_loader import generate_tile_grid
 
 # A tile coordinate, (x, y).  Written out often enough to deserve a name.
 Point = tuple[int, int]
@@ -87,18 +89,26 @@ class Level:
 
         Used for placing pellets and for picking spawn points.
         """
-        # TODO (you): comprehension over range(height) x range(width),
-        # keeping the tiles where is_open().
-        raise NotImplementedError("Level.open_tiles")
+        new: list[Point] = []
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.is_open(x, y):
+                    new.append((x, y))
+        return new
 
     def neighbours(self, tile: Point) -> list[Point]:
         """Return the walkable tiles adjacent to *tile*.
 
         One BFS step.  Diagonals are excluded on purpose.
         """
-        # TODO (you): for each (dx, dy) in STEPS, keep (x+dx, y+dy)
-        # when is_open() says so.
-        raise NotImplementedError("Level.neighbours")
+        x, y = tile
+        new: list[Point] = []
+        for dx, dy in STEPS:
+            nx = x + dx
+            ny = y + dy
+            if self.is_open(nx, ny):
+                new.append((nx, ny))
+        return new
 
     def distances_from(self, start: Point) -> dict[Point, int]:
         """Return the corridor distance from *start* to every tile.
@@ -117,15 +127,23 @@ class Level:
         Returns:
             A mapping of reachable tile -> number of steps from *start*.
         """
-        # TODO (you):
-        # 1. Return the cached map if `start` is already in it.
-        # 2. BFS with collections.deque: start at distance 0, push each
-        #    unvisited neighbour at distance + 1.  (Add the import.)
-        # 3. Before caching, drop the cache if it already holds
-        #    MAX_CACHED_DISTANCE_MAPS entries -- otherwise it grows
-        #    forever on a long run.
-        # 4. Cache and return.
-        raise NotImplementedError("Level.distances_from")
+        cached = self._distance_cache.get(start)
+        if cached is not None:
+            return cached
+        dist: dict[Point, int] = {}
+        if self.is_open(*start):
+            dist[start] = 0
+            queue: deque[Point] = deque([start])
+            while queue:
+                tile = queue.popleft()
+                for nxt in self.neighbours(tile):
+                    if nxt not in dist:
+                        dist[nxt] = dist[tile] + 1
+                        queue.append(nxt)
+        if len(self._distance_cache) >= MAX_CACHED_DISTANCE_MAPS:
+            self._distance_cache.clear()
+        self._distance_cache[start] = dist
+        return dist
 
     def nearest_open(self, target: Point) -> Point:
         """Return the walkable tile closest to *target*.
@@ -143,9 +161,11 @@ class Level:
         Raises:
             ValueError: the maze has no walkable tile at all.
         """
-        # TODO (you): min() over open_tiles() keyed on
-        # abs(x - tx) + abs(y - ty); raise if there are none.
-        raise NotImplementedError("Level.nearest_open")
+        tiles = self.open_tiles()
+        if not tiles:
+            raise ValueError("the maze has no walkable tile")
+        tx, ty = target
+        return min(tiles, key=lambda t: abs(t[0] - tx) + abs(t[1] - ty))
 
     def prune_unreachable(self, start: Point) -> int:
         """Seal every tile that cannot be reached from *start*.
@@ -160,14 +180,14 @@ class Level:
         Returns:
             How many tiles were sealed.
         """
-        # TODO (you):
-        # 1. reachable = distances_from(start).
-        # 2. Every open tile not in `reachable` becomes True (wall).
-        # 3. Clear _distance_cache -- the maze just changed, so every
-        #    cached map is now a lie.  This line is the whole reason
-        #    the cache is private.
-        # 4. Return the count.
-        raise NotImplementedError("Level.prune_unreachable")
+        reachable = self.distances_from(start)
+        sealed = 0
+        for x, y in self.open_tiles():
+            if (x, y) not in reachable:
+                self.grid[y][x] = True
+                sealed += 1
+        self._distance_cache.clear()
+        return sealed
 
     def corner_tiles(self) -> list[Point]:
         """Return the four grid corners, walls included.
@@ -175,16 +195,16 @@ class Level:
         The raw corners, in reading order (NW, NE, SW, SE).  Callers
         pass each through ``nearest_open`` to get a usable tile.
         """
-        # TODO (you): the four (x, y) pairs from width and height.
-        raise NotImplementedError("Level.corner_tiles")
+        right = self.width - 1
+        bottom = self.height - 1
+        return [(0, 0), (right, 0), (0, bottom), (right, bottom)]
 
     def pellets_left(self) -> int:
         """Return how many pellets of either kind are still uneaten.
 
         ``game`` clears the level when this reaches zero.
         """
-        # TODO (you): the two set sizes.
-        raise NotImplementedError("Level.pellets_left")
+        return len(self.pacgums) + len(self.super_pacgums)
 
 
 def create_level(spec: LevelSpec, number: int, seed: int,
@@ -213,16 +233,26 @@ def create_level(spec: LevelSpec, number: int, seed: int,
         ValueError: the maze has too few corridor tiles to place
             everything.
     """
-    # TODO (you):
-    # 1. grid = generate_tile_grid(spec.width, spec.height, seed).
-    #    (Add the import from .maze_loader.)
-    # 2. level = Level(grid, number, seed).
-    # 3. Player spawn: nearest_open() to the centre of the grid.
-    # 4. level.prune_unreachable(player_spawn)  <- before any placing.
-    # 5. Ghost spawns and super-pacgums: nearest_open() to each of the
-    #    four corner_tiles().  Guard against two corners resolving to
-    #    the same tile on a tiny maze.
-    # 6. Pacgums: every remaining open tile, minus the spawn and the
-    #    super-pacgums, kept with probability pacgum_density / 100.
-    # 7. Return the level.
-    raise NotImplementedError("create_level")
+    grid = generate_tile_grid(spec.width, spec.height, seed)
+    level = Level(grid, number, seed)
+    level.player_spawn = level.nearest_open(
+        (level.width // 2, level.height // 2))
+    level.prune_unreachable(level.player_spawn)
+
+    tiles = level.open_tiles()
+    if len(tiles) < 5:
+        raise ValueError(
+            f"maze has only {len(tiles)} corridor tiles, need at least 5")
+    taken = {level.player_spawn}
+    for cx, cy in level.corner_tiles():
+        # Nearest free tile, so two corners never share one on a tiny maze.
+        spot = min((t for t in tiles if t not in taken),
+                   key=lambda t: abs(t[0] - cx) + abs(t[1] - cy))
+        taken.add(spot)
+        level.ghost_spawns.append(spot)
+        level.super_pacgums.add(spot)
+
+    for tile in tiles:
+        if tile not in taken and rng.randrange(100) < pacgum_density:
+            level.pacgums.add(tile)
+    return level
