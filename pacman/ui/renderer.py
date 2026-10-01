@@ -308,11 +308,13 @@ class Screen:
                 Logger.error(f"File {error.filename} not found ...")
                 os._exit(1)
 
-        start_y = (self.height - self.text_height(lines, self.TEXT_SIZE)) // 2
+        size = self.TEXT_SIZE - 2
+        spacing = self.LINE_SPACING - 10
+        start_y = (self.height - self.text_height(lines, size)) // 2
 
         for i, line in enumerate(lines):
-            x = (self.width - self.text_width(line, self.TEXT_SIZE)) // 2
-            self.write(line, screen, x, start_y + i * self.LINE_SPACING, self.TEXT_SIZE, self.colors["white"])
+            x = (self.width - self.text_width(line, size)) // 2
+            self.write(line, screen, x, start_y + i * spacing, size, self.colors["white"])
  
     def tinted_window(self, screen):
         dark_rate = 2
