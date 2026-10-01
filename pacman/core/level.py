@@ -245,7 +245,6 @@ def create_level(spec: LevelSpec, number: int, seed: int,
             f"maze has only {len(tiles)} corridor tiles, need at least 5")
     taken = {level.player_spawn}
     for cx, cy in level.corner_tiles():
-        # Nearest free tile, so two corners never share one on a tiny maze.
         spot = min((t for t in tiles if t not in taken),
                    key=lambda t: abs(t[0] - cx) + abs(t[1] - cy))
         taken.add(spot)
