@@ -3,35 +3,28 @@
 Contents: _load_generator_class(), _generate(), _read_walls(),
   is_closed(), cells_to_tiles(), generate_tile_grid().
 
-This is the **only** module in the project allowed to import
-``mazegenerator`` (see CLAUDE.md).  Subject V.4 requires the assigned
-package to be used unmodified, and it will be re-installed during the
-peer review, so every assumption about its interface lives here and
-nowhere else.  If a reviewer swaps in another group's build, this file
-is the only one that changes.
+The **only** module allowed to import ``mazegenerator`` (see
+CLAUDE.md).  Subject V.4 requires the package unmodified, and a
+reviewer may swap in another group's build, so every assumption about
+it lives here and nowhere else.
 
-What the package gives us, verified against mazegenerator 2.1.0:
+Verified against mazegenerator 2.1.0:
 
-* ``MazeGenerator(size=(w, h), perfect=False, seed=n)`` then ``gen.maze``
-  is a ``list[list[int]]`` indexed ``maze[y][x]`` -- one bitmask per
-  CELL, not per tile.
-* **A set bit means that wall is PRESENT**, not that the way is open.
-  Confirmed from the package's own ``_braid()``, which treats a cell
-  with three or more bits set as a dead end and opens a passage with
-  ``&= ~code``.  A corridor opening is therefore ``not (cell & bit)``.
-* ``perfect=False`` runs ``_braid()``, which removes dead ends, so
-  corridors loop and a chased player is never trapped.
-* Value 15 -- all four walls -- is the package's decorative "42" glyph.
-  Those cells are solid.  On a 14x10 maze with seed 42 they form an
-  18-cell blob across the middle, right where the player spawns.
-* It cannot be trusted about its own shape: ``size=(1, 1)`` returns a
-  2x2 grid.  Validate what comes back.
-* Bad sizes raise a raw ``IndexError`` from inside the package, and it
-  prints ``MazeGenerator Warning: ...`` to stdout, which we cannot
-  switch off.
-* Seed 0 means "pick a random seed" to the package, so callers must
-  pass >= 1.  ``config`` guarantees this for level 1 and ``level`` must
-  do the same for later levels.
+* ``MazeGenerator(size=(w, h), perfect=False, seed=n).maze`` is a
+  ``list[list[int]]``, ``maze[y][x]`` -- one bitmask per CELL, not
+  per tile.
+* **A set bit is a wall that EXISTS**, so an opening is
+  ``not (cell & bit)``.  Confirmed from the package's ``_braid()``,
+  which opens dead ends by clearing bits with ``&= ~code``.
+* ``perfect=False`` runs ``_braid()``: corridors loop, so a chased
+  player is never trapped.  Mandatory, subject V.4.
+* 15 -- all four walls -- is the decorative "42" glyph.  Those cells
+  are solid, and on a 14x10 seed 42 maze they blob across the middle
+  where the player spawns.
+* Its own shape is not trustworthy: ``size=(1, 1)`` returns 2x2.
+* Bad sizes raise a raw ``IndexError`` from inside it, and it prints
+  ``MazeGenerator Warning: ...`` to stdout, which we cannot silence.
+* Seed 0 means "random" to the package, so callers must pass >= 1.
 """
 
 from typing import Any
@@ -213,27 +206,32 @@ def cells_to_tiles(cells: list[list[int]]) -> list[list[bool]]:
     Raises:
         MazeGenerationError: *cells* is empty.
     """
-    # TODO (you):
-    # 1. Guard: empty grid (or an empty first row) -> MazeGenerationError.
-    # 2. height = len(cells); width = len(cells[0]).
-    # 3. Start with EVERYTHING solid:
-    #        tiles = [[True] * (2 * width + 1)
-    #                 for _ in range(2 * height + 1)]
-    #    Carving out of a solid block is safer than walling in an empty
-    #    one -- a tile you forget stays a wall, which is survivable; a
-    #    tile you forget the other way is a hole to walk through.
-    # 4. For each cell (cx, cy): if is_closed(cell) -> `continue`,
-    #    leaving its own tile solid too.  Otherwise open its centre:
-    #        tiles[2 * cy + 1][2 * cx + 1] = False
-    # 5. For each (dx, dy, bit) in NEIGHBOURS: carve the tile between
-    #    the two cells only when ALL of these hold:
-    #      - the bit is clear:  not (cell & bit)     <- open, remember
-    #      - the neighbour is inside the grid        <- keeps the border
-    #      - the neighbour is not is_closed(...)     <- keeps 42 sealed
-    #    The tile between them is at
-    #        tiles[2 * cy + 1 + dy][2 * cx + 1 + dx]
-    # 6. Return tiles.
-    raise NotImplementedError("cells_to_tiles")
+    if not cells:
+        raise MazeGenerationError(
+            "the maze generator returned a grid with no rows")
+    if not cells[0]:
+        raise MazeGenerationError(
+            "the maze generator returned rows with no cells in them")
+    height = len(cells)
+    width = len(cells[0])
+    tiles = [[True] * (2 * width + 1)
+             for _ in range(2 * height + 1)]
+    for cy in range(height):
+        for cx in range(width):
+            cell = cells[cy][cx]
+            if is_closed(cell):
+                continue
+            tiles[2 * cy + 1][2 * cx + 1] = False
+            for dx, dy, bit in NEIGHBOURS:
+                if cell & bit:
+                    continue
+                nx, ny = cx + dx, cy + dy
+                if not (0 <= nx < width and 0 <= ny < height):
+                    continue
+                if is_closed(cells[ny][nx]):
+                    continue
+                tiles[2 * cy + 1 + dy][2 * cx + 1 + dx] = False
+    return tiles
 
 
 def generate_tile_grid(width: int, height: int,
@@ -254,8 +252,6 @@ def generate_tile_grid(width: int, height: int,
     Raises:
         MazeGenerationError: any failure, at any stage.
     """
-    # TODO (you): three lines -- _generate(), _read_walls(),
-    # cells_to_tiles().  Every one of them already raises
-    # MazeGenerationError and nothing else, so there is nothing to
-    # catch here.
-    raise NotImplementedError("generate_tile_grid")
+    generator = _generate(width, height, seed)
+    cells = _read_walls(generator, width, height)
+    return cells_to_tiles(cells)
