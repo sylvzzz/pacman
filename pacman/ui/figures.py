@@ -107,9 +107,15 @@ def pacman(screen: pygame.Surface, cx: int, cy: int, radius: float,
                 screen.fill(body, (x, y, 1, 1))
 
 
+def _snap(value: float, pixel: int) -> int:
+    """Round *value* to a whole number of *pixel*-sized blocks."""
+    return int(round(value / pixel)) * pixel
+
+
 def ghost(screen: pygame.Surface, cx: int, cy: int, radius: float,
           color: tuple, facing: tuple = (0, -1), phase: int = 0,
-          scared: bool = False, face: tuple = (255, 255, 255)) -> None:
+          scared: bool = False, face: tuple = (255, 255, 255),
+          pixel: int = 0) -> None:
     """Stamp a ghost: domed head, straight flanks, scalloped skirt, eyes.
 
     Drawn a column at a time rather than a scanline at a time.  The dome
@@ -126,13 +132,20 @@ def ghost(screen: pygame.Surface, cx: int, cy: int, radius: float,
         facing: unit vector the eyes look along.
         phase: 0/1, which way the skirt waves this frame.
         scared: draw the frightened face instead of the hunting one.
+        pixel: sprite grid in pixels; 0 draws smooth, anything else snaps
+            the silhouette onto the grid so it reads as 16-bit rather
+            than as a ball.
     """
     r = radius
     body, edge = shade(color, LIT), shade(color, RIM)
     notch_w = max(2, int(round(r * 0.52)))
     notch_h = max(2, int(round(r * 0.30)))
+    if pixel:
+        notch_w = _snap(notch_w, pixel) or pixel
+        notch_h = _snap(notch_h, pixel) or pixel
     left = int(round(cx - r))
 
+    columns = []
     for col in range(int(round(cx - r)), int(round(cx + r)) + 1):
         dx = col - cx
         # Top of the column: the dome curves in, the flanks are flat.
@@ -141,24 +154,59 @@ def ghost(screen: pygame.Surface, cx: int, cy: int, radius: float,
         # Bottom of the column: notches, phase shifting the whole pattern.
         notch = ((col - left) // notch_w + phase) % 2
         bottom = int(round(cy + r)) - (notch_h if notch else 0)
-        if bottom <= top:
-            continue
-        screen.fill(edge, (col, top - 1, 1, bottom - top + 3))
+        if pixel:
+            # The snap is the whole trick: the dome now steps down one
+            # block at a time instead of curving, which is the difference
+            # between a 16-bit ghost and a smooth ball.
+            top = int(cy) - _snap(int(cy) - top, pixel)
+            bottom = int(cy) + _snap(bottom - int(cy), pixel)
+        if bottom > top:
+            columns.append((col, top, bottom))
+
+    # Rim for every column first, then the body over the lot.  A one-pixel
+    # rim stamped per column as we go leaves the vertical face of every
+    # stepped dome bare, so the outline reads as loose dashes; overlapping
+    # the rim sideways lets a column cover its neighbour's riser.
+    #
+    # Only the stepped ghosts get the wide rim.  Widening it for the smooth
+    # ones too would outline their flanks, which is a change to the board
+    # nobody asked for -- and at one pixel the two passes are identical to
+    # the old per-column order, so the smooth sprite is untouched.
+    wide = 3 if pixel else 1
+    for col, top, bottom in columns:
+        screen.fill(edge, (col - (wide - 1) // 2, top - 1, wide,
+                           bottom - top + 3))
+    for col, top, bottom in columns:
         screen.fill(body, (col, top, 1, bottom - top))
 
     if scared:
         _scared_face(screen, cx, cy, r, face)
     else:
-        _eyes(screen, cx, cy, r, facing, face)
+        _eyes(screen, cx, cy, r, facing, face, pixel)
 
 
 def _eyes(screen: pygame.Surface, cx: int, cy: int, r: float,
-          facing: tuple, white: tuple = (255, 255, 255)) -> None:
+          facing: tuple, white: tuple = (255, 255, 255),
+          pixel: int = 0) -> None:
     """Two eyes whose pupils lean the way the ghost is heading."""
     pupil = (24, 26, 90)
-    er, pr = r * 0.27, r * 0.135
-    ex, ey = r * 0.42, -r * 0.06
     ox, oy = facing[0] * r * 0.11, facing[1] * r * 0.11
+    if pixel:
+        side = max(2, pixel)
+        for sign in (-1, 1):
+            sx = int(cx + sign * r * 0.42) - side
+            sy = int(cy - r * 0.06) - side // 2
+            screen.fill(white, (sx, sy, side * 2, side * 2))
+            # pupil dentro do olho (evita o restinho que aparecia fora do quadrado)
+            pupil_left = sx + side + int(ox)
+            pupil_top  = sy + side + int(oy)
+            pupil_left = max(sx, min(pupil_left, sx + side - 1))
+            pupil_top  = max(sy, min(pupil_top, sy + side - 1))
+            screen.fill(pupil, (pupil_left, pupil_top, side, side))
+        return
+    er, pr = r * 0.27, r * 0.135
+    ex = r * 0.42
+    ey = -r * 0.06
     for sign in (-1, 1):
         disc(screen, int(cx + sign * ex), int(cy + ey), er, white, rim=False)
         disc(screen, int(cx + sign * ex + ox), int(cy + ey + oy), pr, pupil,

@@ -854,14 +854,14 @@ class Screen:
         pad = MARGIN
         label = shade(self.colors["cyan"], 0.62)
         value = self.colors["white"]
-        self.write("1UP", screen, pad, pad, scale, label)
+        self.write("SCORE", screen, pad, pad, scale, label)
         self.write(f"{self.points:06d}", screen,
-                   pad + self.text_width("1UP", scale) + scale * 3, pad,
+                   pad + self.text_width("SCORE", scale) + scale * 3, pad,
                    scale, value)
         right = self.width - pad - self.text_width("LIVES", scale)
         self.write("LIVES", screen, right, pad, scale, label)
         icon = scale * 3
-        for i in range(max(0, self.playfield.player.lives - 1)):
+        for i in range(max(0, self.playfield.player.lives)):
             pacman(screen, right - (i + 1) * (icon + scale * 2),
                    pad + scale * 3, icon / 2, self.colors["yellow"],
                    (1.0, 0.0), 0.85)
@@ -1203,7 +1203,7 @@ class Screen:
                             self.cheat_menu(screen, cheat_option)
                         elif pressed_first_cheat is True and event.key != pygame.K_2:
                             pressed_first_cheat = False
-                        if on_pause is True:
+                        if on_pause is True and not cheat_on:
                             if event.key == pygame.K_UP:
                                 pause_idx -= 1
                                 menu_option = pause_idx % 2
@@ -1223,10 +1223,10 @@ class Screen:
                             on_pause = False
                             playing = False
                             self.playfield = None
-                        elif event.key == pygame.K_ESCAPE and on_pause is False:
+                        elif event.key == pygame.K_ESCAPE:
                             self.clear(screen)
                             self.pause_menu(screen, menu_option)
-                            on_pause = True
+                            on_pause = not on_pause
 
                         if event.key == pygame.K_r:
                             self.start_level(self.current_level)

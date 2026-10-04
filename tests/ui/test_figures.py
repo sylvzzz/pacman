@@ -16,7 +16,8 @@ import pygame
 import pytest
 
 from pacman.core.entities import Direction, Player
-from pacman.ui.figures import CreatureType, disc, facing_of, ghost, pacman
+from pacman.ui.figures import (CreatureType, disc, facing_of, ghost, pacman,
+                               shade)
 from pacman.ui.playfield import GHOST_COLORS
 from pacman.ui.renderer import MENU_DECOR_PELLETS, Screen
 
@@ -110,6 +111,87 @@ def test_ghost_fits_its_box(surface: pygame.Surface) -> None:
     """A ghost must not spill into the wall beside its corridor."""
     ghost(surface, CX, CY, 14, (255, 64, 64))
     assert all(dim <= 2 * 14 + 3 for dim in extent(surface))
+
+
+@pytest.mark.parametrize("pixel", [0, 4, 6, 8])
+def test_retro_ghost_snaps_onto_the_sprite_grid(
+        surface: pygame.Surface, pixel: int) -> None:
+    """``pixel`` quantizes the silhouette; ``pixel=0`` leaves it smooth.
+
+    The snap is the whole 16-bit effect, so it is checked structurally:
+    every column's top edge has to land on a whole block, and the dome has
+    to end up with far fewer distinct heights than a curve does.
+    """
+    radius = 24
+    surface.fill((0, 0, 0))
+    ghost(surface, CX, CY, radius, (228, 52, 52), pixel=pixel)
+    tops = {}
+    for x in range(SIZE):
+        column = [y for y in range(SIZE)
+                  if surface.get_at((x, y))[:3] != (0, 0, 0)]
+        if column:
+            tops[x] = min(column)
+    assert tops, "ghost drew nothing"
+    steps = len(set(tops.values()))
+    if pixel:
+        # The topmost lit pixel is the rim, which sits one row above the
+        # snapped silhouette, so the grid is checked one row in.
+        assert all((CY - top - 1) % pixel == 0 for top in tops.values()), (
+            "a column top is off the sprite grid")
+        assert steps <= radius // pixel + 1, f"{steps} dome steps, too smooth"
+    else:
+        assert steps > radius // 4, "smooth ghost lost its curve"
+
+
+def test_retro_eyes_are_square(surface: pygame.Surface) -> None:
+    """A round eye on a blocky head is the last thing that reads as vector.
+
+    Each eye is checked as its own bounding box: the pupil is painted
+    inside the eye, so comparing whole rows of white would only measure
+    where the pupil happens to sit.
+    """
+    ghost(surface, CX, CY, 24, (228, 52, 52), facing=(1, 0), pixel=6)
+    white = {(x, y) for y in range(SIZE) for x in range(SIZE)
+             if surface.get_at((x, y))[:3] == (255, 255, 255)}
+    assert white, "retro ghost has no eyes"
+    for right in (False, True):
+        eye = {(x, y) for x, y in white if (x > CX) is right}
+        assert eye, "one eye is missing"
+        xs = [x for x, _ in eye]
+        ys = [y for _, y in eye]
+        width = max(xs) - min(xs) + 1
+        height = max(ys) - min(ys) + 1
+        assert width == height, f"eye is {width}x{height}, not a square"
+
+
+@pytest.mark.parametrize("pixel,continuous", [(6, True), (0, False)])
+def test_ghost_outline_matches_the_mode(
+        surface: pygame.Surface, pixel: int, continuous: bool) -> None:
+    """Stepped ghosts get a closed outline, smooth ones keep the bare flank.
+
+    A one-pixel rim per column leaves the vertical face of each stepped
+    dome bare, so the retro outline read as loose dashes.  Widening the rim
+    fixes that but would also outline the smooth ghosts' flanks, which is a
+    change to the board that was not asked for -- so the two modes differ
+    and this pins both.
+    """
+    color = (228, 52, 52)
+    body, rim = shade(color, 1.18), shade(color, 0.45)
+    surface.fill((0, 0, 0))
+    ghost(surface, CX, CY, 24, color, pixel=pixel)
+    rows = gaps = 0
+    for y in range(SIZE):
+        lit = [x for x in range(SIZE)
+               if surface.get_at((x, y))[:3] == body]
+        if not lit:
+            continue
+        rows += 1
+        for edge_x in (min(lit), max(lit)):
+            if rim not in (surface.get_at((edge_x - 1, y))[:3],
+                           surface.get_at((edge_x + 1, y))[:3]):
+                gaps += 1
+    assert rows > 10
+    assert gaps == 0 if continuous else gaps > 0
 
 
 def test_ghost_skirt_is_wavy(surface: pygame.Surface) -> None:
