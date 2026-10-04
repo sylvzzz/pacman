@@ -17,7 +17,7 @@ install:
 	$(PY) -m pip install mazegenerator-2.1.0-py3-none-any.whl
 
 run:
-	$(PY) pac-man.py
+	$(PY) pac-man.py config.json
 
 debug:
 	$(PY) -m pdb pac-man.py $(CONFIG)

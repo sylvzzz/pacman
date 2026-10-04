@@ -5,7 +5,7 @@ on:
     branches: [main, silva, dbaltaza]
     types: [opened, synchronize]
   push:
-    branches: [silva]
+    branches: [silva, testing]
 
 permissions:
   contents: read
