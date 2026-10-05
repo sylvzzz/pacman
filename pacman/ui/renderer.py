@@ -855,7 +855,7 @@ class Screen:
         label = shade(self.colors["cyan"], 0.62)
         value = self.colors["white"]
         self.write("SCORE", screen, pad, pad, scale, label)
-        self.write(f"{self.points:06d}", screen,
+        self.write(f"{self.points:05d}", screen,
                    pad + self.text_width("SCORE", scale) + scale * 3, pad,
                    scale, value)
         right = self.width - pad - self.text_width("LIVES", scale)
