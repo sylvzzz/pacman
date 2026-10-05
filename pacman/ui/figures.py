@@ -2,15 +2,14 @@
 
 MLX has no shapes and no images (``notes.txt``), so every sprite here is
 computed from geometry and stamped with ``Surface.fill`` -- the one drawing
-call the platform does provide.  The shapes are *computed* rather than kept
-as pixel-art tables because they have to move: a chomping mouth and a ghost
-whose eyes follow its heading are just different numbers, and a table would
-need a hand-drawn copy per frame per direction.
+call the platform does provide.  The player is computed because it has to
+move (a chomping mouth); the ghost is the arcade bitmap, scaled to whatever
+radius the caller asks for, because the real sprite is a fixed pixel-art
+shape and no formula reproduces it faithfully.
 
 MLX also has no alpha channel, so soft edges are faked the cheap way: the
 silhouette is stamped once slightly oversized in a dark shade of its own
-colour, then again at true size on top.  That single rim reads as both an
-outline and a hint of antialiasing, and costs one extra fill per scanline.
+colour, then again at true size on top.
 
 Everything here draws in *pixel* coordinates with the sprite centred on
 ``(cx, cy)``, so callers only have to convert a world position once.
@@ -107,124 +106,128 @@ def pacman(screen: pygame.Surface, cx: int, cy: int, radius: float,
                 screen.fill(body, (x, y, 1, 1))
 
 
-def _snap(value: float, pixel: int) -> int:
-    """Round *value* to a whole number of *pixel*-sized blocks."""
-    return int(round(value / pixel)) * pixel
+# --- The arcade ghost -----------------------------------------------------
+#
+# A 14x14 bitmap: 12 rows of dome and flanks, then a 2-row skirt that
+# alternates between two frames to make it wave.  '#' is body, '.' is empty.
+GHOST_GRID = 14
+
+_GHOST_BODY = [
+    "....######....",
+    "..##########..",
+    ".############.",
+    ".############.",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+]
+_GHOST_SKIRT = [
+    ["###..####..###",
+     "##...####...##"],
+    ["#.###.##.###.#",
+     "..##.####.##.."],
+]
+
+# Hunting eye: a 4x5 white block with the corners cut off.
+_EYE = [".##.",
+        "####",
+        "####",
+        "####",
+        ".##."]
+_EYE_COLS = (2, 8)
+_EYE_ROW = 3
+_PUPIL = (33, 33, 222)
+_WHITE = (255, 255, 255)
+
+
+def _sign(value: float) -> int:
+    """-1, 0 or 1, with a dead zone so a near-zero heading counts as still."""
+    return (value > 0.3) - (value < -0.3)
+
+
+def _block(screen: pygame.Surface, left: float, top: float, s: float,
+           c0: int, r0: int, c1: int, r1: int, color: tuple) -> None:
+    """Fill the sprite-grid rectangle ``[c0, c1) x [r0, r1)``.
+
+    Edges come from one rounding function of the grid line, so two blocks
+    that touch on the grid always touch on screen: no seams at any scale.
+    """
+    x0, x1 = round(left + c0 * s), round(left + c1 * s)
+    y0, y1 = round(top + r0 * s), round(top + r1 * s)
+    screen.fill(color, (x0, y0, max(1, x1 - x0), max(1, y1 - y0)))
+
+
+def _rows(screen: pygame.Surface, left: float, top: float, s: float,
+          rows: list, first_row: int, color: tuple) -> None:
+    """Stamp a list of bitmap rows, merging each row into horizontal runs."""
+    for r, line in enumerate(rows):
+        c = 0
+        while c < GHOST_GRID:
+            if line[c] != "#":
+                c += 1
+                continue
+            start = c
+            while c < GHOST_GRID and line[c] == "#":
+                c += 1
+            _block(screen, left, top, s, start, first_row + r, c,
+                   first_row + r + 1, color)
 
 
 def ghost(screen: pygame.Surface, cx: int, cy: int, radius: float,
           color: tuple, facing: tuple = (0, -1), phase: int = 0,
           scared: bool = False, face: tuple = (255, 255, 255),
-          pixel: int = 0) -> None:
-    """Stamp a ghost: domed head, straight flanks, scalloped skirt, eyes.
+          pixel: int = 0, eyes_only: bool = False) -> None:
+    """Stamp the arcade ghost, centred on ``(cx, cy)``.
 
-    Drawn a column at a time rather than a scanline at a time.  The dome
-    wants scanlines, but the skirt wants vertical notches bitten up into
-    the bottom edge, and those cannot be expressed as one span per row --
-    doing it per row slices the ghost into floating slabs.  Per column both
-    fall out of the same loop: the top of the column follows the dome, the
-    bottom follows the notch.
+    The sprite is a square ``2 * radius`` on a side.
 
     Args:
-        cx, cy: centre of the head in pixels.
-        radius: body radius in pixels.
+        cx, cy: centre in pixels.
+        radius: half the sprite's side in pixels.
         color: body colour.
-        facing: unit vector the eyes look along.
+        facing: heading; the pupils lean that way.
         phase: 0/1, which way the skirt waves this frame.
-        scared: draw the frightened face instead of the hunting one.
-        pixel: sprite grid in pixels; 0 draws smooth, anything else snaps
-            the silhouette onto the grid so it reads as 16-bit rather
-            than as a ball.
+        scared: draw the frightened face instead of the hunting eyes.
+        face: colour of the frightened eyes and mouth.
+        pixel: ignored; kept so older call sites keep working.  The sprite
+            is always the arcade bitmap now.
+        eyes_only: draw just the eyes, which is what an eaten ghost looks
+            like on its way home.
     """
-    r = radius
-    body, edge = shade(color, LIT), shade(color, RIM)
-    notch_w = max(2, int(round(r * 0.52)))
-    notch_h = max(2, int(round(r * 0.30)))
-    if pixel:
-        notch_w = _snap(notch_w, pixel) or pixel
-        notch_h = _snap(notch_h, pixel) or pixel
-    left = int(round(cx - r))
+    s = 2.0 * radius / GHOST_GRID
+    left, top = cx - radius, cy - radius
 
-    columns = []
-    for col in range(int(round(cx - r)), int(round(cx + r)) + 1):
-        dx = col - cx
-        # Top of the column: the dome curves in, the flanks are flat.
-        rise = math.sqrt(max(0.0, r * r - dx * dx))
-        top = int(round(cy - rise)) if abs(dx) < r else int(round(cy))
-        # Bottom of the column: notches, phase shifting the whole pattern.
-        notch = ((col - left) // notch_w + phase) % 2
-        bottom = int(round(cy + r)) - (notch_h if notch else 0)
-        if pixel:
-            # The snap is the whole trick: the dome now steps down one
-            # block at a time instead of curving, which is the difference
-            # between a 16-bit ghost and a smooth ball.
-            top = int(cy) - _snap(int(cy) - top, pixel)
-            bottom = int(cy) + _snap(bottom - int(cy), pixel)
-        if bottom > top:
-            columns.append((col, top, bottom))
+    if not eyes_only:
+        _rows(screen, left, top, s, _GHOST_BODY, 0, color)
+        _rows(screen, left, top, s, _GHOST_SKIRT[int(phase) % 2],
+              len(_GHOST_BODY), color)
 
-    # Rim for every column first, then the body over the lot.  A one-pixel
-    # rim stamped per column as we go leaves the vertical face of every
-    # stepped dome bare, so the outline reads as loose dashes; overlapping
-    # the rim sideways lets a column cover its neighbour's riser.
-    #
-    # Only the stepped ghosts get the wide rim.  Widening it for the smooth
-    # ones too would outline their flanks, which is a change to the board
-    # nobody asked for -- and at one pixel the two passes are identical to
-    # the old per-column order, so the smooth sprite is untouched.
-    wide = 3 if pixel else 1
-    for col, top, bottom in columns:
-        screen.fill(edge, (col - (wide - 1) // 2, top - 1, wide,
-                           bottom - top + 3))
-    for col, top, bottom in columns:
-        screen.fill(body, (col, top, 1, bottom - top))
-
-    if scared:
-        _scared_face(screen, cx, cy, r, face)
-    else:
-        _eyes(screen, cx, cy, r, facing, face, pixel)
-
-
-def _eyes(screen: pygame.Surface, cx: int, cy: int, r: float,
-          facing: tuple, white: tuple = (255, 255, 255),
-          pixel: int = 0) -> None:
-    """Two eyes whose pupils lean the way the ghost is heading."""
-    pupil = (24, 26, 90)
-    ox, oy = facing[0] * r * 0.11, facing[1] * r * 0.11
-    if pixel:
-        side = max(2, pixel)
-        for sign in (-1, 1):
-            sx = int(cx + sign * r * 0.42) - side
-            sy = int(cy - r * 0.06) - side // 2
-            screen.fill(white, (sx, sy, side * 2, side * 2))
-            # pupil dentro do olho (evita o restinho que aparecia fora do quadrado)
-            pupil_left = sx + side + int(ox)
-            pupil_top  = sy + side + int(oy)
-            pupil_left = max(sx, min(pupil_left, sx + side - 1))
-            pupil_top  = max(sy, min(pupil_top, sy + side - 1))
-            screen.fill(pupil, (pupil_left, pupil_top, side, side))
+    if scared and not eyes_only:
+        # Two small square eyes and a zigzag mouth.
+        _block(screen, left, top, s, 4, 5, 6, 7, face)
+        _block(screen, left, top, s, 8, 5, 10, 7, face)
+        for c in (2, 4, 6, 8, 10):
+            _block(screen, left, top, s, c, 9, c + 1, 10, face)
+        for c in (3, 5, 7, 9, 11):
+            _block(screen, left, top, s, c, 10, c + 1, 11, face)
         return
-    er, pr = r * 0.27, r * 0.135
-    ex = r * 0.42
-    ey = -r * 0.06
-    for sign in (-1, 1):
-        disc(screen, int(cx + sign * ex), int(cy + ey), er, white, rim=False)
-        disc(screen, int(cx + sign * ex + ox), int(cy + ey + oy), pr, pupil,
-             rim=False)
 
-
-def _scared_face(screen: pygame.Surface, cx: int, cy: int,
-                 r: float, white: tuple = (255, 255, 255)) -> None:
-    """The panicking face: dot eyes and a wavy mouth."""
-    er = max(1.0, r * 0.17)
-    for sign in (-1, 1):
-        disc(screen, int(cx + sign * r * 0.38), int(cy - r * 0.10), er, white,
-             rim=False)
-    wy = int(cy + r * 0.40)
-    for i in range(5):
-        x = int(cx - r * 0.60 + i * r * 0.30)
-        screen.fill(white, (x, wy + (r * 0.18 if i % 2 else 0),
-                            max(2, int(r * 0.22)), max(2, int(r * 0.16))))
+    dx, dy = _sign(facing[0]), _sign(facing[1])
+    for ec in _EYE_COLS:
+        for r, line in enumerate(_EYE):
+            for c, ch in enumerate(line):
+                if ch == "#":
+                    _block(screen, left, top, s, ec + c, _EYE_ROW + r,
+                           ec + c + 1, _EYE_ROW + r + 1, _WHITE)
+        # Pupil is 2x2 inside the 4x5 eye: 3 columns, 3 usable rows.
+        pc = ec + 1 + dx
+        pr = _EYE_ROW + (0 if dy < 0 else 1 if dy == 0 else 3)
+        _block(screen, left, top, s, pc, pr, pc + 2, pr + 2, _PUPIL)
 
 
 def facing_of(entity: Mover) -> tuple:

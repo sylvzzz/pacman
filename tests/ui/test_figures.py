@@ -118,7 +118,7 @@ def test_retro_ghost_snaps_onto_the_sprite_grid(
         surface: pygame.Surface, pixel: int) -> None:
     """``pixel`` quantizes the silhouette; ``pixel=0`` leaves it smooth.
 
-    The snap is the whole 16-bit effect, so it is checked structurally:
+    The snap is the whole 8-bit effect, so it is checked structurally:
     every column's top edge has to land on a whole block, and the dome has
     to end up with far fewer distinct heights than a curve does.
     """

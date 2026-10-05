@@ -29,6 +29,14 @@ MENU_DECOR_SEED = 20240
 #: Pellets scattered per free band on the home menu.
 MENU_DECOR_PELLETS = 14
 
+# The arcade's frightened ghost: a blue body with a peach face, and in the
+# other half of the flash a white body with a red face.  Kept out of
+# ``Screen.colors`` because the winner screen cycles through that dict as
+# its rainbow.
+FRIGHT_BLUE = (33, 33, 222)
+FACE_PEACH = (255, 184, 174)
+FACE_RED = (255, 0, 0)
+
 KEY_TO_DIRECTION = {
     pygame.K_UP: Direction.UP,
     pygame.K_DOWN: Direction.DOWN,
@@ -92,7 +100,6 @@ class Screen:
         # deliberately slow: the eye is on the maze constantly, so motion
         # here is ambience and must never pull focus off the next corridor.
         self.CHOMP_PERIOD = 0.19
-        self.PELLET_PERIOD = 1.25
         self.GHOST_PERIOD = 0.42
         self.FRIGHT_FLASH = 0.26
 
@@ -111,8 +118,8 @@ class Screen:
         self.playfield: Playfield | None = None
         self.points = 0
         # Drives every sprite animation from one monotonic clock, so the
-        # mouth, the skirt and the power pellets stay in step and can never
-        # drift apart or restart on their own.
+        # mouth and the skirt stay in step and can never drift apart or
+        # restart on their own.
         self.anim = 0.0
         self.dt = 0.0
         self.popups: list[dict] = []
@@ -281,9 +288,9 @@ class Screen:
             selected: index of the highlighted row, or -1 for none.
             hint: controls line along the bottom.
             colors: optional colour per row, overriding the default.
-            suffixes: optional ``(text, colour)`` per row, right-aligned in a
-                gutter.  Used for the cheat toggles, whose state has to line
-                up down the screen independently of the labels.
+            suffixes: optional ``(text, colour)`` per row, drawn just after
+                the label.  Used for the cheat toggles, whose state has to
+                read as part of the option it belongs to.
         """
         scale = self.hud_scale()
         title_scale = scale + 3
@@ -306,7 +313,15 @@ class Screen:
             else:
                 color = (self.colors["yellow"] if chosen
                          else self.colors["slate"])
-            x = (self.width - self.text_width(text, item_scale)) // 2
+            tail = suffixes[i][0] if suffixes is not None else ""
+            tail_color = suffixes[i][1] if suffixes is not None else color
+            # Centre the label and its state as one unit.  A right-aligned
+            # state column read as a separate table, which is why the cheat
+            # options looked off-centre: the toggle belongs to its option.
+            tail_w = self.text_width(tail, item_scale) if tail else 0
+            gap = scale * 3 if tail else 0
+            label_w = self.text_width(text, item_scale)
+            x = (self.width - label_w - tail_w - gap) // 2
             if chosen:
                 # The marker is its own glyph in its own colour, in the
                 # gutter left of the label, so the labels stay aligned and
@@ -314,15 +329,9 @@ class Screen:
                 self.write("*", screen, x - item_scale * 7, y, item_scale,
                            self.colors["cyan"])
             self.write(text, screen, x, y, item_scale, color)
-            if suffixes is not None:
-                tail, tail_color = suffixes[i]
-                if tail:
-                    # Right-aligned at a fixed x, not offset by the label
-                    # width: the whole point of a state column is that the
-                    # states line up with each other.
-                    self.write(tail, screen, self.width - MARGIN
-                               - self.text_width(tail, item_scale), y,
-                               item_scale, tail_color)
+            if tail:
+                self.write(tail, screen, x + label_w + gap, y, item_scale,
+                           tail_color)
             y += self.LETTER_H * item_scale + scale * 3
 
         if hint:
@@ -334,12 +343,13 @@ class Screen:
     def menu_bands(self, radius: int) -> tuple:
         """Return the two ``(low, high)`` bands the home panel leaves empty.
 
-        Same vertical arithmetic as ``draw_panel``, so the scatter can
+        Same vertical arithmetic as ``draw_panel``, so the decoration can
         never land on the title or a row.  Inset by the ghost sprite's
-        real extent rather than its radius: a ghost is taller than it is
-        wide, and centring it in a band that only clears the radius drops
-        its feet on the title.  ``test_menu_decor_lands_only_in_the_gutters``
-        is what catches it if the panel layout ever moves.
+        full height (``2 * radius``, the sprite is a square) rather than
+        its radius: centring it in a band that only clears the radius
+        drops its feet on the title.
+        ``test_menu_decor_lands_only_in_the_gutters`` is what catches it
+        if the panel layout ever moves.
         """
         scale = self.hud_scale()
         top = max(scale * 4, self.height // 6)
@@ -350,65 +360,67 @@ class Screen:
         return ((tall, top - tall),
                 (rows + tall, self.height - scale * 13 - tall))
 
-    def menu_corners(self, radius: int) -> tuple:
-        """Return one ``(x0, x1, y0, y1)`` box per screen corner.
-
-        A ghost in each corner reads as a deliberate arrangement; the same
-        four ghosts scattered at random read as debris.
-        """
-        (top_lo, top_hi), (bot_lo, bot_hi) = self.menu_bands(radius)
-        pad = self.hud_scale() * 7
-        half = self.width // 2
-        left = (pad + radius, half)
-        right = (half, self.width - pad - radius)
-        return ((right, (top_lo, top_hi)),
-                (left, (top_lo, top_hi)),
-                (left, (bot_lo, bot_hi)),
-                (right, (bot_lo, bot_hi)))
-
     def menu_decor(self) -> tuple:
         """Pick the home menu's ghost and pellet scatter, once per process.
 
-        One ghost per corner, in ``GHOST_COLORS`` order: upper right,
-        upper left, lower left, lower right.  Rolled once from a fixed
-        seed and then reused -- the panel repaints on every arrow key and
-        every frame of the loop, so picking fresh positions each time
-        would make the screen boil, and a fixed seed keeps the wallpaper
-        identical between runs.
+        The window is split into four quadrants and each one gets exactly
+        one ghost, at a random spot inside the free part of that quadrant
+        (the panel in the middle is never touched), in ``GHOST_COLORS``
+        order: upper right, upper left, lower left, lower right.  Pellets
+        are spread over the two free bands and are kept clear of the
+        ghosts so nothing overlaps.  Rolled once from a fixed seed and
+        reused: the panel repaints on every key press, so new positions
+        each time would make the screen boil.
+
+        Returns:
+            ``(ghosts, pellets)`` where a ghost is
+            ``(x, y, facing, colour_name)`` and a pellet is
+            ``(x, y, radius)``.
         """
         if self._decor is None:
             rng = random.Random(MENU_DECOR_SEED)
             scale = self.hud_scale()
             radius = scale * 4
-            ghosts = []
-            for color, (xs, ys) in zip(GHOST_COLORS, self.menu_corners(radius)):
-                ghosts.append((rng.randint(xs[0], max(xs)),
-                               rng.randint(ys[0], max(ys)),
-                               rng.choice(((1, 0), (-1, 0), (0, 1), (0, -1))),
-                               color))
             pad = scale * 7
+            half = self.width // 2
+            top_band, bottom_band = self.menu_bands(radius)
+            left = (pad + radius, half - radius)
+            right = (half + radius, self.width - pad - radius)
+            quadrants = ((right, top_band), (left, top_band),
+                         (left, bottom_band), (right, bottom_band))
+
+            ghosts = []
+            for color, (xs, ys) in zip(GHOST_COLORS, quadrants):
+                ghosts.append((
+                    rng.randint(xs[0], max(xs[0], xs[1])),
+                    rng.randint(ys[0], max(ys[0], ys[1])),
+                    rng.choice(((1, 0), (-1, 0), (0, 1), (0, -1))),
+                    color))
+
             span = self.width - 2 * pad
             slot = span / MENU_DECOR_PELLETS
             pellets = []
-            # Radii off the board's own: a plain pellet there is about
-            # three pixels and a power pellet about six, which is what
-            # gives them the stepped edge instead of a smooth bubble.
-            #
             # Even slots with a jitter inside each, not a free draw per
-            # pellet: 28 uniform randoms clump, and a bald patch reads as
-            # a mistake where an even spread reads as scattered.
+            # pellet: uniform randoms clump, and a bald patch reads as a
+            # mistake where an even spread reads as scattered.  A pellet
+            # that lands on a ghost is re-rolled a few times, then dropped.
             for low, high in self.menu_bands(scale // 2):
                 for i in range(MENU_DECOR_PELLETS):
                     big = rng.random() < 0.22
-                    pellets.append((
-                        round(pad + slot * (i + rng.uniform(0.2, 0.8))),
-                        rng.randint(low, max(low, high)),
-                        scale if big else scale // 2))
+                    size = scale if big else scale // 2
+                    for _ in range(6):
+                        x = round(pad + slot * (i + rng.uniform(0.2, 0.8)))
+                        y = rng.randint(low, max(low, high))
+                        if all(max(abs(x - gx), abs(y - gy))
+                               > radius + size + 4
+                               for gx, gy, _, _ in ghosts):
+                            pellets.append((x, y, size))
+                            break
             self._decor = (ghosts, pellets)
         return self._decor
 
     def draw_menu_decor(self, screen) -> None:
-        """Scatter the four corner ghosts and some pellets round the menu."""
+        """Draw the four ghosts and the scattered pellets round the menu."""
         ghosts, pellets = self.menu_decor()
         radius = self.hud_scale() * 4
         body = self.colors["pellet"]
@@ -433,7 +445,7 @@ class Screen:
                         "ESC RESUME")
 
     def cheat_menu(self, screen, selected = -1) -> None:
-        """Draw the cheat list with each toggle's state in its own column."""
+        """Draw the cheat list with each toggle's state beside its option."""
         suffixes = []
         for name in self.cheat_options:
             if name == "EXIT":
@@ -721,21 +733,16 @@ class Screen:
         The model owns what is left to eat, so the drawing follows the
         model rather than keeping a second copy that can disagree.
 
-        Power pellets breathe on a slow sine so they read as the one thing
-        on the board worth going out of your way for.  The period is long
-        and the radius barely moves, because this is ambience: the player
-        is watching the next corridor, not the corners.
+        Power pellets have a fixed size: they are told apart from plain
+        pellets by their radius and halo alone, with no animation.
         """
         if self.playfield is None:
             return
         field = self.playfield.level
-        ox, oy = self.maze_origin()
         size = self.entity_size()
         small_r = max(1.5, size * 0.11)
         body, halo = self.colors["pellet"], shade(self.colors["pellet"], 0.5)
-        breath = 0.5 + 0.5 * math.sin(2 * math.pi * self.anim
-                                      / self.PELLET_PERIOD)
-        big_r = size * (0.21 + 0.035 * breath)
+        big_r = size * 0.23
         for tx, ty in sorted(field.pacgums):
             cx, cy = self.centre_of(tx, ty)
             self.stamp_pellet(screen, cx, cy, small_r, body)
@@ -797,30 +804,34 @@ class Screen:
                facing_of(player), mouth)
 
     def draw_ghosts_from_core(self, screen) -> None:
-        """Draw the four ghosts, with eyes on their heading.
+        """Draw the four ghosts the way the arcade does.
 
-        An edible ghost flashes between blue and white on a fixed period,
-        the universal "eat me now" signal, and every ghost's skirt waves on
-        the same slow beat so the board feels alive without the sprites
-        drawing attention away from the corridors.
+        A hunting ghost is its own colour with white eyes looking along its
+        heading.  An edible ghost flashes between a blue body with a peach
+        face and a white body with a red face, the universal "eat me now"
+        signal.  An eaten ghost is just a pair of eyes heading home.  Every
+        ghost's skirt waves on the same slow beat so the board feels alive
+        without the sprites drawing attention away from the corridors.
         """
         if self.playfield is None:
             return
         phase = int(self.anim / self.GHOST_PERIOD) % 2
         flash = int(self.anim / self.FRIGHT_FLASH) % 2 == 0
+        radius = self.entity_size() / 2
         for spirit, color_name in zip(self.playfield.ghosts, GHOST_COLORS):
+            cx, cy = self.centre_of(spirit.x, spirit.y)
+            if spirit.state == GhostState.EATEN:
+                ghost(screen, cx, cy, radius, (0, 0, 0),
+                      facing_of(spirit), eyes_only=True)
+                continue
             if spirit.is_edible:
-                color = self.colors["blue"] if flash else self.colors["white"]
-                # The white half of the flash is a solid silhouette, so the
-                # face has to flip to dark or the ghost reads as a blob.
-                face = self.colors["white"] if flash else self.colors["wall_core"]
+                color = FRIGHT_BLUE if flash else self.colors["white"]
+                face = FACE_PEACH if flash else FACE_RED
+                ghost(screen, cx, cy, radius, color, facing_of(spirit),
+                      phase, scared=True, face=face)
             else:
-                color = self.colors[color_name]
-                face = self.colors["white"]
-            ghost(screen, *self.centre_of(spirit.x, spirit.y),
-                  self.entity_size() / 2, color,
-                  facing_of(spirit), phase,
-                  scared=spirit.is_edible, face=face)
+                ghost(screen, cx, cy, radius, self.colors[color_name],
+                      facing_of(spirit), phase)
 
     def draw_popups(self, screen) -> None:
         """Draw and retire the floating score rewards."""
@@ -1173,6 +1184,12 @@ class Screen:
                         selected = menu_idx % len(self.menu_options)
                         self.clear(screen)
                         self.show_menu(screen, selected)
+                    elif not playing and event.key == pygame.K_SPACE:
+                        self.clear(screen)
+                        self.show_menu(screen, 0)
+                        on_pause = False
+                        playing = False
+                        self.playfield = None
 
                     elif playing is True:
                         if cheat_on is True:
