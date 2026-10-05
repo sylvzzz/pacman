@@ -961,7 +961,6 @@ class Screen:
         """
         name = self.cheat_options[index]
         if name == "EXIT":
-            Logger.log(name)
             return True
         on = not self.cheats_activated[name]
         self.cheats_activated[name] = on
