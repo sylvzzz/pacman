@@ -113,6 +113,19 @@ class Mover:
         self.target = None
         self.progress = 0.0
 
+    def turn_around(self) -> None:
+        """U-turn on the spot, mid-corridor, without moving.
+
+        Only the pair (tile, target) is swapped and the progress
+        mirrored, so the interpolated position stays exactly where it
+        was.  Does nothing while standing on a tile centre.
+        """
+        if self.target is None or self.direction is None:
+            return
+        self.tile, self.target = self.target, self.tile
+        self.progress = 1.0 - self.progress
+        self.direction = self.direction.opposite()
+
     def advance(self, dt: float, level: Level,
                 pick: DirectionPicker) -> None:
         """Move for *dt* seconds, calling *pick* at every tile centre.
@@ -192,8 +205,35 @@ class Player(Mover):
                 return way
         return None
 
+    def reverse_now(self) -> None:
+        """U-turn on the spot when the buffered turn is the opposite way.
+
+        Turns are normally taken at tile centres, but a reversal is safe
+        anywhere: the player is on the corridor it just came from.  Taking
+        it at once, instead of at the next centre, is what makes the
+        controls feel snappy.  Position does not change, only the pair
+        (tile, target) is swapped and the progress mirrored.
+        """
+        if (self.direction is not None
+                and self.wanted is self.direction.opposite()):
+            self.turn_around()
+
+    @property
+    def nearest_tile(self) -> Point:
+        """Return the tile the player is closest to.
+
+        After an instant U-turn ``tile`` is no longer "the last tile
+        arrived on", so what the player is standing on is decided by
+        distance: the pellet there is eaten once the centre is within
+        half a tile.
+        """
+        if self.target is not None and self.progress >= 0.5:
+            return self.target
+        return self.tile
+
     def update(self, dt: float, level: Level) -> None:
         """Advance for *dt* seconds, steering with ``pick_direction``."""
+        self.reverse_now()
         self.advance(dt, level, lambda: self.pick_direction(level))
 
 
@@ -231,6 +271,9 @@ class Ghost(Mover):
         state: current ``GhostState``.
         frightened_timer: seconds of edibility left.
         respawn_timer: seconds until an eaten ghost returns.
+        release_timer: seconds it still waits on its home tile before
+            leaving; ``game`` staggers these so the pack does not leave
+            in one block.
     """
 
     def __init__(self, home: Point, speed: float,
@@ -242,6 +285,7 @@ class Ghost(Mover):
         self.state = GhostState.NORMAL
         self.frightened_timer = 0.0
         self.respawn_timer = 0.0
+        self.release_timer = 0.0
 
     @property
     def is_edible(self) -> bool:
@@ -262,6 +306,7 @@ class Ghost(Mover):
         self.state = GhostState.NORMAL
         self.frightened_timer = 0.0
         self.respawn_timer = 0.0
+        self.release_timer = 0.0
 
     def frighten(self, duration: float) -> None:
         """Make the ghost edible for *duration* seconds.
@@ -269,9 +314,12 @@ class Ghost(Mover):
         Ignored while EATEN.  Frightening an already frightened ghost
         restarts the timer: a second super-pacgum extends the effect.
         """
-        if self.state is not GhostState.EATEN:
-            self.state = GhostState.FRIGHTENED
-            self.frightened_timer = duration
+        if self.state is GhostState.EATEN:
+            return
+        if self.state is GhostState.NORMAL:
+            self.turn_around()      # the arcade flips the pack's heading
+        self.state = GhostState.FRIGHTENED
+        self.frightened_timer = duration
 
     def eat(self, respawn_time: float) -> None:
         """Send the ghost home as EATEN until *respawn_time* passes.
@@ -286,10 +334,13 @@ class Ghost(Mover):
     def tick(self, dt: float) -> None:
         """Count the active timer down by *dt* and change state at zero.
 
-        FRIGHTENED counts ``frightened_timer`` and returns to NORMAL;
+        A ghost still waiting to be released counts ``release_timer``
+        down as well.  FRIGHTENED counts ``frightened_timer`` and
+        returns to NORMAL;
         EATEN counts ``respawn_timer`` and returns to NORMAL; NORMAL
         does nothing.  Clamp the finished timer to 0.0.
         """
+        self.release_timer = max(0.0, self.release_timer - dt)
         if self.state is GhostState.FRIGHTENED:
             self.frightened_timer -= dt
             if self.frightened_timer <= 0:

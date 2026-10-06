@@ -385,3 +385,76 @@ def test_ghost_moves_like_any_mover() -> None:
     g = make_ghost((1, 1))
     g.advance(10.0, CORRIDOR, always(Direction.RIGHT))
     assert g.tile == (3, 1)
+
+
+def test_player_reverses_instantly_mid_corridor() -> None:
+    """The opposite key turns the player round without waiting a tile."""
+    p = Player((1, 1), 5.0, 3)
+    p.wanted = Direction.RIGHT
+    p.update(0.1, CORRIDOR)  # half a tile along
+    x_before = p.x
+    p.wanted = Direction.LEFT
+    p.reverse_now()
+    assert p.direction is Direction.LEFT
+    assert p.x == pytest.approx(x_before)
+    p.update(0.1, CORRIDOR)
+    assert p.x < x_before
+
+
+def test_player_reverse_ignores_other_keys() -> None:
+    """Only the opposite key reverses; a side key waits for a junction."""
+    p = Player((1, 1), 5.0, 3)
+    p.wanted = Direction.RIGHT
+    p.update(0.1, CORRIDOR)
+    p.wanted = Direction.DOWN
+    p.reverse_now()
+    assert p.direction is Direction.RIGHT
+
+
+def test_nearest_tile_follows_the_closest_centre() -> None:
+    """Past halfway the player counts as standing on the next tile."""
+    p = Player((1, 1), 5.0, 3)
+    p.wanted = Direction.RIGHT
+    p.update(0.06, CORRIDOR)  # 0.3 of a tile
+    assert p.nearest_tile == (1, 1)
+    p.update(0.06, CORRIDOR)  # 0.6
+    assert p.nearest_tile == (2, 1)
+
+
+def test_turn_around_keeps_the_position() -> None:
+    """A mid-corridor U-turn swaps the ends without moving anything."""
+    m = Mover((1, 1), 5.0)
+    m.advance(0.1, CORRIDOR, always(Direction.RIGHT))
+    x = m.x
+    m.turn_around()
+    assert m.x == pytest.approx(x)
+    assert m.direction is Direction.LEFT
+    m.advance(0.1, CORRIDOR, always(Direction.LEFT))
+    assert m.x < x
+
+
+def test_turn_around_on_a_tile_centre_does_nothing() -> None:
+    """Standing still, there is nothing to reverse."""
+    m = Mover((2, 1), 5.0)
+    m.turn_around()
+    assert m.direction is None and m.tile == (2, 1)
+
+
+def test_frightening_a_moving_ghost_reverses_it() -> None:
+    """Becoming edible flips the ghost's heading, once."""
+    g = Ghost((1, 1), 5.0, Personality.CHASER)
+    g.advance(0.1, CORRIDOR, always(Direction.RIGHT))
+    g.frighten(5.0)
+    assert g.direction is Direction.LEFT
+    g.frighten(5.0)          # already frightened: no second flip
+    assert g.direction is Direction.LEFT
+
+
+def test_release_timer_counts_down() -> None:
+    """A waiting ghost's release timer runs out and stays at zero."""
+    g = Ghost((1, 1), 5.0, Personality.CHASER)
+    g.release_timer = 1.0
+    g.tick(0.4)
+    assert g.release_timer == pytest.approx(0.6)
+    g.tick(5.0)
+    assert g.release_timer == 0.0

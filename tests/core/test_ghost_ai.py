@@ -142,3 +142,15 @@ def test_choice_is_always_open() -> None:
                 way = choose_ghost_direction(ghost, FORK, player, rng)
                 assert way is not None
                 assert FORK.is_open(*way.step(ghost.tile))
+
+
+def test_scattering_ghost_heads_for_its_corner() -> None:
+    """In scatter the player is ignored and the home corner is the goal."""
+    ghost = ghost_at((4, 1))
+    ghost.home = (1, 1)
+    player = Player((7, 1), 5.0, 3)
+    rng = random.Random(1)
+    assert choose_ghost_direction(
+        ghost, HALL, player, rng, scatter=True) is Direction.LEFT
+    assert choose_ghost_direction(
+        ghost, HALL, player, rng, scatter=False) is Direction.RIGHT

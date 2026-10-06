@@ -66,7 +66,7 @@ def _load_generator_class() -> Any:
             MazeGenerator.
     """
     try:
-        from mazegenerator import (  # type: ignore[import-untyped]
+        from mazegenerator import (  # type: ignore[import-untyped,unused-ignore]  # noqa: E501
             MazeGenerator,
         )
     except ImportError as e:

@@ -6,18 +6,21 @@ Planned contents: Canvas (pixel-buffer access, hand-rasterised
   cached per level, entities, HUD, pause and end panels).
 """
 from pacman.ui.blockfont import Character
-from pacman.ui.log import Logger
 from pacman.ui.maze import Wall
+from pacman.ui.highscores import HighscoreEntry
 from pacman.ui.figures import (CreatureType, facing_of, ghost,
-                                pacman, shade)
-from pacman.ui.playfield import GHOST_COLORS, Playfield
-from pacman.core.entities import Direction, GhostState
+                               pacman, shade)
+from pacman.core.config import GameConfig
+from pacman.core.entities import Direction, Ghost, GhostState
+from pacman.core.game import Game, Phase
+from pacman.core.level import Level
 from pacman.core.maze_loader import _generate
 import math
-import os
-import pygame
 import random
-import time
+from pathlib import Path
+from typing import Any
+
+import pygame
 
 # Arrow keys onto the core's directions.  The two enums disagree on
 # purpose -- the core counts tiles the way the model reads them (UP is
@@ -37,12 +40,24 @@ FRIGHT_BLUE = (33, 33, 222)
 FACE_PEACH = (255, 184, 174)
 FACE_RED = (255, 0, 0)
 
+Color = tuple[int, int, int]
+
+# Ghost colours in the core's order: Blinky, Pinky, Inky, Clyde.
+GHOST_COLORS = ("red", "magenta", "orange", "cyan")
+
 KEY_TO_DIRECTION = {
-    pygame.K_UP: Direction.UP,
-    pygame.K_DOWN: Direction.DOWN,
-    pygame.K_LEFT: Direction.LEFT,
-    pygame.K_RIGHT: Direction.RIGHT,
+    "up": Direction.UP,
+    "down": Direction.DOWN,
+    "left": Direction.LEFT,
+    "right": Direction.RIGHT,
+    "w": Direction.UP,
+    "s": Direction.DOWN,
+    "a": Direction.LEFT,
+    "d": Direction.RIGHT,
 }
+
+# Function keys of the reviewer cheat mode, by name.
+CHEAT_FUNCTION_KEYS = ("f1", "f2", "f3", "f4", "f5", "f6", "f7")
 
 # Sprite diameter, in pixels, of the player, a ghost and a pellet.  Kept
 # just under the corridor so entities never overlap a wall.
@@ -59,7 +74,7 @@ WALL_MASKS = {code: Wall(code).wall for code in range(16)}
 
 
 class Screen:
-    def __init__(self, config) -> None:
+    def __init__(self, config: GameConfig) -> None:
         self.config = config
         self.width = config.window_width
         self.height = config.window_height
@@ -102,10 +117,23 @@ class Screen:
         self.CHOMP_PERIOD = 0.19
         self.GHOST_PERIOD = 0.42
         self.FRIGHT_FLASH = 0.26
+        # Power pellets blink like the arcade's, on and off.
+        self.POWER_BLINK = 0.22
+        # Seconds of flashing before a frightened ghost turns back.
+        self.FRIGHT_WARNING = 2.0
+        # How long the player's death animation plays, in seconds.
+        self.DEATH_TIME = 1.2
+        self.death_left = 0.0
+        # Best score on the table, shown in the header; set by the app.
+        self.high_score = 0
+        self.high_score = 0
+        self.death_pos = (0.0, 0.0)
+        self.death_facing = (1.0, 0.0)
 
         # Create a simple 20x20 maze
         self.current_level = 0
-        self.cheat_options = ["INVICIBILITY", "SKIP LEVEL", "FREEZE GHOSTS", "2x SPEED", "EXIT"]
+        self.cheat_options = ["INVINCIBILITY", "SKIP LEVEL",
+                              "FREEZE GHOSTS", "2x SPEED", "EXIT"]
         self.levels = config.levels
         self.seed = config.seed
         self.mw, self.mh = (self.levels[self.current_level].width,
@@ -113,17 +141,24 @@ class Screen:
         self.maze_gen = _generate(self.mw, self.mh, self.seed)
         self.maze_cells = self._populate_cells()
 
-        # The core model for the level being played.  None until a game
+        # The core game for the run in progress.  None until a game
         # starts; the menu does not need one.
-        self.playfield: Playfield | None = None
+        self.game: Game | None = None
+        # The core level the maze layers were built for, so a level change
+        # inside ``Game`` (it advances by itself) is noticed and redrawn.
+        self._shown_level: Level | None = None
+        # Per-level drawing caches, rebuilt when the level changes.
+        self._maze_surface: tuple[list[Any], pygame.Surface] | None = None
+        self._origin_cache: tuple[tuple[int, int],
+                                  tuple[int, int]] | None = None
         self.points = 0
         # Drives every sprite animation from one monotonic clock, so the
         # mouth and the skirt stay in step and can never drift apart or
         # restart on their own.
         self.anim = 0.0
         self.dt = 0.0
-        self.popups: list[dict] = []
-        self.stamps: dict[float, list] = {}
+        self.popups: list[dict[str, Any]] = []
+        self.stamps: dict[float, list[Any]] = {}
 
         self.maze_width = self.maze_gen._width
         self.maze_height = self.maze_gen._height
@@ -140,48 +175,9 @@ class Screen:
         self.chars = Character(" ").chars
 
         self.menu_options = ["Play", "View Highscores", "Instructions", "Exit"]
-        self._decor = None
-        self.key_chars = {
-            pygame.K_a:   "a",
-            pygame.K_b:   "b",
-            pygame.K_c:   "c",
-            pygame.K_d:   "d",
-            pygame.K_e:   "e",
-            pygame.K_f:   "f",
-            pygame.K_g:   "g",
-            pygame.K_h:   "h",
-            pygame.K_i:   "i",
-            pygame.K_j:   "j",
-            pygame.K_k:   "k",
-            pygame.K_l:   "l",
-            pygame.K_m:   "m",
-            pygame.K_n:   "n",
-            pygame.K_o:   "o",
-            pygame.K_p:   "p",
-            pygame.K_q:   "q",
-            pygame.K_r:   "r",
-            pygame.K_s:   "s",
-            pygame.K_t:   "t",
-            pygame.K_u:   "u",
-            pygame.K_v:   "v",
-            pygame.K_w:   "w",
-            pygame.K_x:   "x",
-            pygame.K_y:   "y",
-            pygame.K_z:   "z",
-            pygame.K_0:   "0",
-            pygame.K_1:   "1",
-            pygame.K_2:   "2",
-            pygame.K_3:   "3",
-            pygame.K_4:   "4",
-            pygame.K_5:   "5",
-            pygame.K_6:   "6",
-            pygame.K_7:   "7",
-            pygame.K_8:   "8",
-            pygame.K_9:   "9",
-        }
-
+        self._decor: tuple[list[Any], list[Any]] | None = None
         self.cheats_activated = {
-            "INVICIBILITY": False,
+            "INVINCIBILITY": False,
             "SKIP LEVEL": False,
             "FREEZE GHOSTS": False,
             "2x SPEED": False,
@@ -206,7 +202,8 @@ class Screen:
                 )
         return cells
 
-    def write_char(self, char: str, screen, size: int, x: int, y: int, color = (255, 255, 0)) -> None:
+    def write_char(self, char: str, screen: pygame.Surface, size: int,
+                   x: int, y: int, color: Color = (255, 255, 0)) -> None:
         block = self.chars.get(char, " ")
         for row, line in enumerate(block):
             for col, bit in enumerate(line):
@@ -224,8 +221,9 @@ class Screen:
     def text_height(self, texts: list[str], size: int) -> int:
         return (len(texts) - 1) * self.LINE_SPACING + self.LETTER_H * size
 
-    def write(self, text: str, screen, x: int, y: int, size: int,
-              color=(255, 255, 0), tracking: int = 5) -> None:
+    def write(self, text: str, screen: pygame.Surface, x: int, y: int,
+              size: int, color: Color = (255, 255, 0),
+              tracking: int = 5) -> None:
         """Draw *text* with its top-left at ``(x, y)``.
 
         Args:
@@ -237,39 +235,18 @@ class Screen:
             self.write_char(ch, screen, size, x, y, color)
             x += self.LETTER_W * size + tracking
 
-    def hline(self, screen, x: int, y: int, w: int, color: tuple,
+    def hline(self, screen: pygame.Surface, x: int, y: int, w: int,
+              color: Color,
               thickness: int = 2) -> None:
         """Draw a horizontal rule, used to separate a title from its list."""
         if w > 0:
             screen.fill(color, (x, y, w, thickness))
 
-    def set_player_name(self, screen, name) -> None:
-        """Prompt for the run's name, with a caret while there is room.
-
-        The caret is a solid underscore, not a blink: MLX has no clock to
-        drive one, and a steady caret is easier to aim at anyway.
-        """
-        self.clear(screen)
-        start_y = (self.height
-                   - self.text_height(self.menu_options, self.TEXT_SIZE)) // 2
-        self.draw_line(screen, "Enter your name",
-                       start_y - 20 - self.LINE_SPACING,
-                       self.TEXT_SIZE + 2, self.colors["gold"])
-        caret = name + "_" if len(name) < 10 else name
-        self.draw_line(screen, caret, start_y + 2 * self.LINE_SPACING,
-                       self.TEXT_SIZE, self.colors["cyan"])
-
-    def valid_name(self, text: str) -> bool:
-        if not text:
-            return False
-        for char in text:
-            if char.lower() not in "abcdefghijklmnopqrstuvwxyz0123456789":
-                return False
-        return True
-
-    def draw_panel(self, screen, title: str, items: list, selected: int,
-                   hint: str = "", colors: list | None = None,
-                   suffixes: list | None = None) -> None:
+    def draw_panel(self, screen: pygame.Surface, title: str,
+                   items: list[str], selected: int, hint: str = "",
+                   colors: list[Color] | None = None,
+                   suffixes: list[tuple[str, Color]] | None = None
+                   ) -> None:
         """Draw a titled list of choices, centred, with the selection marked.
 
         Every menu used to be its own copy of the same loop, which is why
@@ -293,8 +270,8 @@ class Screen:
                 read as part of the option it belongs to.
         """
         scale = self.hud_scale()
-        title_scale = scale + 3
-        item_scale = scale + 1
+        title_scale = max(3, scale + 1)
+        item_scale = max(2, scale - 1)
         top = max(scale * 4, self.height // 6)
 
         tracking = scale * 2
@@ -340,7 +317,7 @@ class Screen:
             self.draw_line(screen, hint, self.height - scale * 11, scale,
                            self.colors["slate"])
 
-    def menu_bands(self, radius: int) -> tuple:
+    def menu_bands(self, radius: int) -> tuple[Any, ...]:
         """Return the two ``(low, high)`` bands the home panel leaves empty.
 
         Same vertical arithmetic as ``draw_panel``, so the decoration can
@@ -360,7 +337,7 @@ class Screen:
         return ((tall, top - tall),
                 (rows + tall, self.height - scale * 13 - tall))
 
-    def menu_decor(self) -> tuple:
+    def menu_decor(self) -> tuple[list[Any], list[Any]]:
         """Pick the home menu's ghost and pellet scatter, once per process.
 
         The window is split into four quadrants and each one gets exactly
@@ -419,7 +396,7 @@ class Screen:
             self._decor = (ghosts, pellets)
         return self._decor
 
-    def draw_menu_decor(self, screen) -> None:
+    def draw_menu_decor(self, screen: pygame.Surface) -> None:
         """Draw the four ghosts and the scattered pellets round the menu."""
         ghosts, pellets = self.menu_decor()
         radius = self.hud_scale() * 4
@@ -433,18 +410,20 @@ class Screen:
                 self.stamp_pellet(screen, x, y, size + 1.5, halo)
             self.stamp_pellet(screen, x, y, size, body)
 
-    def show_menu(self, screen, selected = -1) -> None:
+    def show_menu(self, screen: pygame.Surface, selected: int = -1) -> None:
         """Draw the main menu over whatever is already on screen."""
         self.draw_menu_decor(screen)
         self.draw_panel(screen, "PAC-MAN", self.menu_options, selected,
                         "ARROWS MOVE    ENTER SELECT    Q QUIT")
 
-    def pause_menu(self, screen, selected = -1) -> None:
+    def pause_menu(self, screen: pygame.Surface,
+                   selected: int = -1) -> None:
         """Draw the pause overlay."""
         self.draw_panel(screen, "PAUSED", ["Resume", "Main Menu"], selected,
                         "ESC RESUME")
 
-    def cheat_menu(self, screen, selected = -1) -> None:
+    def cheat_menu(self, screen: pygame.Surface,
+                   selected: int = -1) -> None:
         """Draw the cheat list with each toggle's state beside its option."""
         suffixes = []
         for name in self.cheat_options:
@@ -455,18 +434,28 @@ class Screen:
                 suffixes.append(("ON" if on else "OFF", self.colors["green"]
                                  if on else self.colors["red"]))
         self.draw_panel(screen, "CHEATS", self.cheat_options, selected,
-                        "ARROWS MOVE    ENTER TOGGLE    Q BACK", None, suffixes)
+                        "ARROWS MOVE    ENTER TOGGLE    ESC BACK", None,
+                        suffixes)
 
-    def show_instructions(self, screen) -> None:
-        lines = []
-        try:
-            with open("instructions.txt") as file:
-                for line in file:
-                    lines.append(line.strip())
-        except FileNotFoundError as error:
-            Logger.error(f"File {error.filename} not found ...")
-            os._exit(1)
+    def instruction_lines(self) -> list[str]:
+        """Return the lines of ``instructions.txt``.
 
+        Looked up in the working directory first, then next to the
+        package, so a packaged build still finds it.  A missing file is
+        reported on the page itself instead of stopping the game.
+        """
+        for folder in (Path.cwd(), Path(__file__).resolve().parents[2]):
+            try:
+                text = (folder / "instructions.txt").read_text(
+                    encoding="utf-8")
+            except OSError:
+                continue
+            return [line.strip() for line in text.splitlines()]
+        return ["instructions.txt was not found."]
+
+    def show_instructions(self, screen: pygame.Surface) -> None:
+        """Draw the how-to-play page."""
+        lines = self.instruction_lines()
         scale = self.hud_scale()
         title = "HOW TO PLAY"
         tracking = scale * 2
@@ -474,8 +463,6 @@ class Screen:
         top = max(scale * 4, self.height // 6)
 
         # Shrink the body until the whole file fits above the bottom edge.
-        # instructions.txt is longer than the window at full size and used
-        # to run off the bottom, so the last line was never readable.
         budget = self.height - top - self.LETTER_H * title_scale - scale * 9
         size = max(2, scale - 1)
         while size > 2:
@@ -498,51 +485,39 @@ class Screen:
             if not line:
                 y += spacing // 2
                 continue
-            # draw_line shrinks to fit: the longest line in
-            # instructions.txt is wider than the window at this scale and
-            # used to be clipped at both edges.
+            # draw_line shrinks a line to fit the window width.
             self.draw_line(screen, line, y, size, self.colors["slate"])
             y += spacing
 
-    def show_highscores(self, screen) -> None:
-        import json
+    def show_highscores(self, screen: pygame.Surface,
+                        entries: list[HighscoreEntry]) -> None:
+        """Draw the top-10 table, best first.
 
-        try:
-            with open("players.json") as file:
-                players_json = json.load(file)
-        except json.JSONDecodeError:
-            Logger.error("Invalid JSON in players data ...")
-            os._exit(1)
-        except FileNotFoundError as error:
-            Logger.error(f"File {error.filename} not found ...")
-            os._exit(1)
-
+        Args:
+            screen: the surface to draw on.
+            entries: the table rows, already sorted by the table.
+        """
         title = "Top 10 Highest Scores"
-        # Sort before slicing: .items() is a view and cannot be subscripted,
-        # and slicing first would take the first ten names in file order
-        # rather than the ten highest scores.
-        players = sorted(players_json.items(),
-                         key=lambda item: item[1]['score'],
-                         reverse=True)[:10]
-        start_y = (self.height - self.text_height(players, self.TEXT_SIZE)) // 2
-
+        rows = [f"{rank}  -  {entry.name}  -  {entry.score}"
+                for rank, entry in enumerate(entries, start=1)]
+        if not rows:
+            rows = ["No scores yet"]
+        start_y = (self.height
+                   - self.text_height(rows, self.TEXT_SIZE)) // 2
         self.draw_line(screen, title, start_y - self.LINE_SPACING,
                        self.TEXT_SIZE + 2, self.colors["gold"])
-
         start_y += 30
-
-        # Podium reads first, the rest recedes.  Nothing down here may be
-        # darker than slate: maroon was 2.6:1 on this background, which is
-        # a line you cannot actually read.
+        # The podium reads first, the rest recedes (never darker than
+        # slate: anything dimmer is unreadable on this background).
         medals = {1: self.colors["gold"], 2: self.colors["white"],
                   3: self.colors["yellow"]}
-        for rank, (name, player_data) in enumerate(players, start=1):
-            self.draw_line(screen, f'{rank}  -  {name}  -  {player_data["score"]}',
-                           start_y + rank * self.LINE_SPACING,
+        for rank, text in enumerate(rows, start=1):
+            self.draw_line(screen, text, start_y + rank * self.LINE_SPACING,
                            self.TEXT_SIZE,
                            medals.get(rank, self.colors["slate"]))
 
-    def code_to_walls(self, raw_maze: list) -> list:
+    def code_to_walls(self, raw_maze: list[list[int]]) -> list[list[Wall]]:
+        """Wrap every cell code of the maze in a ``Wall``."""
         return [[Wall(w) for w in row] for row in raw_maze]
 
     def build_maze_layers(self) -> None:
@@ -598,9 +573,8 @@ class Screen:
                         # The bright core sits inside the band, so the walls
                         # read as lit tubes rather than flat slabs.
                         t = max(1, self.core_thickness())
-                        self.maze_layers.append(((x + t, y + t,
-                                                   w - 2 * t, h - 2 * t),
-                                                  core))
+                        inner = (x + t, y + t, w - 2 * t, h - 2 * t)
+                        self.maze_layers.append((inner, core))
 
     def entity_size(self) -> int:
         """Diameter in pixels of the player, a ghost or a power pellet.
@@ -620,20 +594,51 @@ class Screen:
         """Thickness of the lit line inside a wall band, in pixels."""
         return max(1, round(self.cell_size * 0.045))
 
-    def render_maze(self, screen, maze=None) -> None:
+    def render_maze(self, screen: pygame.Surface, maze: Any = None) -> None:
         """Replay the cached wall rectangles.
 
         Args:
             screen: the surface to paint on.
             maze: unused; kept so existing callers keep working.  The maze
-                is built in ``start_level`` now.
+                is built in ``sync_level`` now.
         """
-        for rect, color in self.maze_layers:
-            screen.fill(color, rect)
+        cached = self._maze_surface
+        if cached is None or cached[0] is not self.maze_layers:
+            # The walls only change with the level, so paint them once
+            # onto a window-sized surface and blit it every frame instead
+            # of replaying hundreds of rectangles.
+            image = pygame.Surface((self.width, self.height))
+            image.fill(self.colors["void"])
+            for rect, color in self.maze_layers:
+                image.fill(color, rect)
+            cached = (self.maze_layers, image)
+            self._maze_surface = cached
+        screen.blit(cached[1], (0, 0))
 
     def hud_height(self) -> int:
-        """Pixels reserved above the maze for the score and lives."""
-        return self.hud_scale() * 10 + MARGIN * 2
+        """Pixels reserved above the maze for the score row."""
+        scale = self.play_scale()
+        return scale * (2 * self.LETTER_H + 3) + MARGIN * 2
+
+    def footer_height(self) -> int:
+        """Pixels reserved below the maze for the lives and the level."""
+        return self.play_scale() * (self.LETTER_H + 3) + MARGIN
+
+    def play_scale(self) -> int:
+        """Blockfont scale for the in-game HUD, kept small and quiet.
+
+        Half the menu scale, like the arcade's thin header, and never so
+        wide that "HIGH SCORE" and "TIME" would touch their neighbours.
+        """
+        scale = max(2, self.hud_scale() // 2)
+        while scale > 1:
+            need = (self.text_width("1UP", scale, scale)
+                    + self.text_width("HIGH SCORE", scale, scale)
+                    + self.text_width("TIME", scale, scale) + scale * 8)
+            if need <= self.width - 2 * MARGIN:
+                break
+            scale -= 1
+        return scale
 
     def hud_scale(self) -> int:
         """Blockfont scale for the HUD, kept proportional to the window."""
@@ -645,12 +650,17 @@ class Screen:
         Centred horizontally, but centred in the space *below* the HUD so a
         short maze never grows up underneath the score.
         """
+        key = (id(self.maze_gen), self.cell_size)
+        if self._origin_cache is not None and self._origin_cache[0] == key:
+            return self._origin_cache[1]
         grid = self.maze_gen.maze
         cols, rows = len(grid[0]), len(grid)
         top = self.hud_height() + MARGIN
-        return ((self.width - cols * self.cell_size) // 2,
-                top + max(0, (self.height - top - MARGIN
-                              - rows * self.cell_size) // 2))
+        origin = ((self.width - cols * self.cell_size) // 2,
+                  top + max(0, (self.height - top - self.footer_height()
+                                - rows * self.cell_size) // 2))
+        self._origin_cache = (key, origin)
+        return origin
 
     def fit_cell_size(self) -> int:
         """Pick the largest cell that still fits this level on screen.
@@ -662,7 +672,8 @@ class Screen:
         """
         grid = self.maze_gen.maze
         cols, rows = len(grid[0]), len(grid)
-        usable_h = (self.height - self.hud_height() - 2 * MARGIN)
+        usable_h = (self.height - self.hud_height() - self.footer_height()
+                    - MARGIN)
         room = min((self.width - 2 * MARGIN) // cols, usable_h // rows)
         return max(MIN_CELL, room - room % 2)
 
@@ -690,24 +701,44 @@ class Screen:
                 round(oy + (ty - 1) / 2 * self.cell_size
                       + (self.cell_size - sprite) / 2))
 
-    def start_level(self, index: int) -> None:
-        """Build the core model and the drawing data for level *index*.
-
-        Both sides generate the same maze from the same size and seed, so
-        the walls drawn from ``maze_gen`` and the tiles the model walks
-        always describe one maze.  Only the resolution differs, and
-        ``tile_to_pixel`` bridges it.
-
-        Args:
-            index: 0-based level index into the configured levels.
+    def start_game(self) -> None:
+        """Begin a new run: a fresh core ``Game`` from level 1.
 
         Raises:
-            IndexError: *index* is past the last configured level.
+            pacman.core.errors.MazeGenerationError: the first maze cannot
+                be built.
         """
-        self.current_level = index
-        spec = self.levels[index]
+        self.game = Game(self.config)
+        self.death_left = 0.0
+        self.cheats_activated = dict.fromkeys(self.cheats_activated, False)
+        self.sync_level()
+
+    def restart_game(self) -> None:
+        """Restart the run in progress from level 1 with a fresh score."""
+        if self.game is None:
+            return
+        self.game.start()
+        self.death_left = 0.0
+        self.cheats_activated = dict.fromkeys(self.cheats_activated, False)
+        self.sync_level()
+
+    def sync_level(self) -> None:
+        """Rebuild the drawing data for the level the core is now on.
+
+        The walls are drawn from the same maze the model walks: the core
+        level carries the seed it was built from (levels after the first
+        use a random one), so the maze is regenerated from *that* seed
+        and the two always describe one maze.  ``tile_to_pixel`` bridges
+        the tile and cell resolutions.
+        """
+        game = self.game
+        if game is None:
+            return
+        level = game.level
+        spec = self.levels[game.level_index]
+        self.current_level = game.level_index
         self.mw, self.mh = spec.width, spec.height
-        self.maze_gen = _generate(self.mw, self.mh, self.seed)
+        self.maze_gen = _generate(self.mw, self.mh, level.seed)
         self.maze_width = self.maze_gen._width
         self.maze_height = self.maze_gen._height
         self.cell_size = self.fit_cell_size()
@@ -717,8 +748,8 @@ class Screen:
         self.band_offset = [0, thickness, thickness + corridor]
         self.maze_cells = self._populate_cells()
         self.build_maze_layers()
-        self.playfield = Playfield(spec, index + 1, self.config)
-        self.points = self.playfield.score
+        self._shown_level = level
+        self.points = game.score
         self.popups = []
 
     def centre_of(self, tx: float, ty: float) -> tuple[int, int]:
@@ -727,7 +758,7 @@ class Screen:
         return (round(ox + (tx - 1) / 2 * self.cell_size + self.cell_size / 2),
                 round(oy + (ty - 1) / 2 * self.cell_size + self.cell_size / 2))
 
-    def draw_pellets(self, screen) -> None:
+    def draw_pellets(self, screen: pygame.Surface) -> None:
         """Draw every pellet the core still has, from the core's own sets.
 
         The model owns what is left to eat, so the drawing follows the
@@ -736,9 +767,9 @@ class Screen:
         Power pellets have a fixed size: they are told apart from plain
         pellets by their radius and halo alone, with no animation.
         """
-        if self.playfield is None:
+        if self.game is None:
             return
-        field = self.playfield.level
+        field = self.game.level
         size = self.entity_size()
         small_r = max(1.5, size * 0.11)
         body, halo = self.colors["pellet"], shade(self.colors["pellet"], 0.5)
@@ -746,13 +777,15 @@ class Screen:
         for tx, ty in sorted(field.pacgums):
             cx, cy = self.centre_of(tx, ty)
             self.stamp_pellet(screen, cx, cy, small_r, body)
-        for tx, ty in sorted(field.super_pacgums):
+        blink = int(self.anim / self.POWER_BLINK) % 2 == 0
+        for tx, ty in sorted(field.super_pacgums if blink else ()):
             cx, cy = self.centre_of(tx, ty)
             self.stamp_pellet(screen, cx, cy, big_r + 1.5, halo)
             self.stamp_pellet(screen, cx, cy, big_r, body)
 
-    def stamp_pellet(self, screen, cx: int, cy: int, radius: float,
-                     color: tuple) -> None:
+    def stamp_pellet(self, screen: pygame.Surface, cx: int, cy: int,
+                     radius: float,
+                     color: Color) -> None:
         """Stamp one pellet as horizontal runs, the way the board does.
 
         Deliberately not :func:`~pacman.ui.figures.disc`: a pellet solved
@@ -763,7 +796,7 @@ class Screen:
         for dy, span in self.pellet_stamp(radius):
             screen.fill(color, (cx - span, cy + dy, 2 * span + 1, 1))
 
-    def pellet_stamp(self, radius: float) -> list:
+    def pellet_stamp(self, radius: float) -> list[Any]:
         """Scanline half-widths of a pellet of *radius*, memoised.
 
         Every pellet on the board is the same size, so the circle is solved
@@ -780,7 +813,7 @@ class Screen:
             self.stamps[key] = stamp
         return stamp
 
-    def draw_player_from_core(self, screen) -> None:
+    def draw_player_from_core(self, screen: pygame.Surface) -> None:
         """Draw the player where the core model currently is.
 
         The mouth cycles while the player is actually travelling and rests
@@ -790,9 +823,15 @@ class Screen:
         and it never gates input -- movement stays exactly as fast as the
         core says it is.
         """
-        if self.playfield is None:
+        if self.game is None:
             return
-        player = self.playfield.player
+        player = self.game.player
+        if self.death_left > 0:
+            progress = 1.0 - self.death_left / self.DEATH_TIME
+            pacman(screen, *self.centre_of(*self.death_pos),
+                   self.entity_size() / 2, self.colors["yellow"],
+                   (0.0, -1.0), min(1.95, 1.0 + progress))
+            return
         moving = player.direction is not None
         if moving:
             phase = (self.anim % self.CHOMP_PERIOD) / self.CHOMP_PERIOD
@@ -803,7 +842,7 @@ class Screen:
                self.entity_size() / 2, self.colors["yellow"],
                facing_of(player), mouth)
 
-    def draw_ghosts_from_core(self, screen) -> None:
+    def draw_ghosts_from_core(self, screen: pygame.Surface) -> None:
         """Draw the four ghosts the way the arcade does.
 
         A hunting ghost is its own colour with white eyes looking along its
@@ -813,27 +852,29 @@ class Screen:
         ghost's skirt waves on the same slow beat so the board feels alive
         without the sprites drawing attention away from the corridors.
         """
-        if self.playfield is None:
+        if self.game is None or self.death_left > 0:
             return
         phase = int(self.anim / self.GHOST_PERIOD) % 2
         flash = int(self.anim / self.FRIGHT_FLASH) % 2 == 0
         radius = self.entity_size() / 2
-        for spirit, color_name in zip(self.playfield.ghosts, GHOST_COLORS):
+        for spirit, color_name in zip(self.game.ghosts, GHOST_COLORS):
             cx, cy = self.centre_of(spirit.x, spirit.y)
             if spirit.state == GhostState.EATEN:
                 ghost(screen, cx, cy, radius, (0, 0, 0),
                       facing_of(spirit), eyes_only=True)
                 continue
             if spirit.is_edible:
-                color = FRIGHT_BLUE if flash else self.colors["white"]
-                face = FACE_PEACH if flash else FACE_RED
+                warn = spirit.frightened_timer < self.FRIGHT_WARNING
+                lit = flash or not warn
+                color = FRIGHT_BLUE if lit else self.colors["white"]
+                face = FACE_PEACH if lit else FACE_RED
                 ghost(screen, cx, cy, radius, color, facing_of(spirit),
                       phase, scared=True, face=face)
             else:
                 ghost(screen, cx, cy, radius, self.colors[color_name],
                       facing_of(spirit), phase)
 
-    def draw_popups(self, screen) -> None:
+    def draw_popups(self, screen: pygame.Surface) -> None:
         """Draw and retire the floating score rewards."""
         for popup in list(self.popups):
             left = popup["life"] / popup["span"]
@@ -852,79 +893,95 @@ class Screen:
         """Blockfont scale for score popups."""
         return max(2, self.hud_scale() - 1)
 
-    def draw_hud(self, screen) -> None:
-        """Draw the score, the level and the remaining lives.
+    def draw_hud(self, screen: pygame.Surface) -> None:
+        """Draw the arcade-style header and footer, small and quiet.
 
-        Lives are drawn as little Pac-Men rather than the word "LIVES":
-        the icon is read pre-attentively, so a glance at the corner is
-        enough to know how many are left without counting digits.
+        Header: ``1UP`` over the score on the left, ``HIGH SCORE`` in the
+        middle, ``TIME`` on the right, each label over its number the way
+        the arcade stacks them.  Footer: one little Pac-Man per life on
+        the left, the level on the right.  The ``1UP`` blinks, as it does
+        in the arcade, and the clock turns red for the last ten seconds.
         """
-        if self.playfield is None:
+        if self.game is None:
             return
-        scale = self.hud_scale()
+        scale = self.play_scale()
+        track = scale
         pad = MARGIN
-        label = shade(self.colors["cyan"], 0.62)
+        label = self.colors["white"]
         value = self.colors["white"]
-        self.write("SCORE", screen, pad, pad, scale, label)
-        self.write(f"{self.points:05d}", screen,
-                   pad + self.text_width("SCORE", scale) + scale * 3, pad,
-                   scale, value)
-        right = self.width - pad - self.text_width("LIVES", scale)
-        self.write("LIVES", screen, right, pad, scale, label)
-        icon = scale * 3
-        for i in range(max(0, self.playfield.player.lives)):
-            pacman(screen, right - (i + 1) * (icon + scale * 2),
-                   pad + scale * 3, icon / 2, self.colors["yellow"],
-                   (1.0, 0.0), 0.85)
+        row = self.LETTER_H * scale + scale * 2
 
-    def save_player(self, name: str, points: int) -> None:
-        import json
+        def field(text: str, number: str, left: int, tint: Color) -> None:
+            """Draw *text* over *number*, centred on each other at *left*."""
+            width = max(self.text_width(text, scale, track),
+                        self.text_width(number, scale, track))
+            for line, y, color in ((text, pad, label),
+                                   (number, pad + row, tint)):
+                self.write(line, screen,
+                           left + (width - self.text_width(line, scale,
+                                                           track)) // 2,
+                           y, scale, color, track)
 
-        try:
-            with open("players.json", "r") as file:
-                players = json.load(file)
-                if players.get(name, False):
-                    players[name]["score"] += points
-                else:
-                    players[name] = {}
-                    players[name]["score"] = points
-            with open("players.json", "w") as file:
-                json.dump(players, file, indent=2)
-        except json.JSONDecodeError:
-            Logger.error("Invalid JSON in players data ...")
-            os._exit(1)
-        except FileNotFoundError as error:
-            Logger.error(f"File {error.filename} not found ...")
-            os._exit(1)
+        blink = int(self.anim * 2) % 2 == 0
+        field("1UP" if blink else "   ", f"{self.points:05d}", pad, value)
+        best = max(self.high_score, self.points)
+        centre = self.text_width("HIGH SCORE", scale, track)
+        field("HIGH SCORE", f"{best:05d}", (self.width - centre) // 2, value)
+        seconds = max(0, int(self.game.time_left))
+        urgent = seconds <= 10 and int(self.anim * 4) % 2 == 0
+        clock_w = self.text_width("TIME", scale, track)
+        field("TIME", f"{seconds:03d}", self.width - pad - clock_w,
+              self.colors["red"] if urgent else value)
 
-    def game_loop(self, screen, dt: float) -> None:
-        """Advance the core model by *dt* seconds and draw the result.
+        # Footer: lives on the left, level on the right.
+        foot = self.height - self.footer_height() + scale * 2
+        icon = scale * 4
+        for i in range(max(0, self.game.lives)):
+            pacman(screen, pad + icon // 2 + i * (icon + scale * 2),
+                   foot + icon // 2 - scale, icon / 2,
+                   self.colors["yellow"], (-1.0, 0.0), 0.85)
+        level = f"LEVEL {self.game.level.number:02d}"
+        self.write(level, screen,
+                   self.width - pad - self.text_width(level, scale, track),
+                   foot, scale, self.colors["slate"], track)
+
+    def step_game(self, dt: float) -> None:
+        """Advance the core game by *dt* seconds.
 
         Every rule -- movement, turning, eating, frightening, being caught
-        -- belongs to the core.  This method only steps it and paints what
-        it now says, so there is exactly one model of the game.
+        -- belongs to the core.  This only steps it and keeps the
+        animation clock, the level drawing and the popups in step.
 
         Args:
-            screen: the pygame surface to draw on.
             dt: seconds since the previous frame.
         """
-        if self.playfield is None:
+        if self.game is None:
             return
         self.anim += dt
         self.dt = dt
-        was = [spirit.state for spirit in self.playfield.ghosts]
-        self.playfield.update(dt)
-        for spirit, state in zip(self.playfield.ghosts, was):
+        if self.death_left > 0:
+            self.death_left -= dt
+            return
+        was = [spirit.state for spirit in self.game.ghosts]
+        lives = self.game.lives
+        px, py = self.game.player.x, self.game.player.y
+        self.game.update(dt)
+        if self.game.lives < lives:
+            self.death_left = self.DEATH_TIME
+            self.death_pos = (px, py)
+        if self.game.level is not self._shown_level:
+            self.sync_level()
+        for spirit, state in zip(self.game.ghosts, was):
             if state != GhostState.EATEN and spirit.state == GhostState.EATEN:
                 self.reward_ghost(spirit)
-        self.points = self.playfield.score
-        self.draw_frame(screen)
+        self.points = self.game.score
 
-    def reward_ghost(self, spirit) -> None:
+    def reward_ghost(self, spirit: Ghost) -> None:
         """Float the ghost's score up from where it was eaten."""
+        cx, cy = self.centre_of(spirit.x, spirit.y)
         self.popups.append({
-            "x": self.centre_of(spirit.x, spirit.y)[0] - self.popup_span() // 2,
-            "y": self.centre_of(spirit.x, spirit.y)[1] - self.popup_scale() * 4,
+            "x": cx - self.popup_span() // 2,
+            "y": cy - self.popup_scale() * 4,
             "text": str(self.config.points_per_ghost),
             "color": self.colors["cyan"],
             "life": 0.85,
@@ -934,9 +991,10 @@ class Screen:
 
     def popup_span(self) -> int:
         """Pixel width of the widest score popup."""
-        return self.text_width(str(self.config.points_per_ghost), self.popup_scale())
+        return self.text_width(str(self.config.points_per_ghost),
+                               self.popup_scale())
 
-    def draw_frame(self, screen) -> None:
+    def draw_frame(self, screen: pygame.Surface) -> None:
         """Paint one whole frame: maze, pellets, player, ghosts, HUD."""
         self.clear(screen)
         self.render_maze(screen, self.code_to_walls(self.maze_gen.maze))
@@ -945,13 +1003,37 @@ class Screen:
         self.draw_ghosts_from_core(screen)
         self.draw_hud(screen)
         self.draw_popups(screen)
+        self.draw_banner(screen)
+
+    def draw_banner(self, screen: pygame.Surface) -> None:
+        """Announce the phases where play is frozen: READY and level won."""
+        if self.game is None:
+            return
+        text = {Phase.READY: "READY!",
+                Phase.LEVEL_WON: "LEVEL CLEARED"}.get(self.game.phase)
+        color = self.colors["yellow"]
+        if self.death_left > 0:
+            text, color = "OUCH!", self.colors["red"]
+        if text is None:
+            return
+        size = self.TEXT_SIZE + 2
+        step = self.LETTER_W * size + 2
+        width = len(text) * step + size * 6
+        height = self.LETTER_H * size + size * 4
+        y = self.height // 2 - height // 2
+        # A solid plate keeps the words legible over the maze, the way
+        # the arcade blanks the area under READY!.
+        screen.fill(self.colors["void"],
+                    ((self.width - width) // 2, y, width, height))
+        self.draw_line(screen, text, y + size * 2, size, color)
 
     def toggle_cheat(self, index: int) -> bool:
         """Toggle the cheat at *index* and push the effect into the core.
 
-        The menu only ever flipped a dict; the rules live in the model, so
-        the change is handed to the ``Playfield`` here rather than being
-        re-implemented on this side.
+        The rules live in ``Game``; this only forwards the request and
+        then mirrors the switches it reports, so the menu can never show
+        a state the model does not have.  A config with
+        ``cheats_enabled`` false leaves ``Game`` ignoring all of it.
 
         Args:
             index: position in ``cheat_options``.
@@ -962,57 +1044,76 @@ class Screen:
         name = self.cheat_options[index]
         if name == "EXIT":
             return True
-        on = not self.cheats_activated[name]
-        self.cheats_activated[name] = on
-        if self.playfield is None:
+        game = self.game
+        if game is None:
             return False
-        if name == "INVICIBILITY":
-            self.playfield.set_invincible(on)
+        if not game.cheats.active:
+            game.toggle_cheats()
+        if name == "INVINCIBILITY":
+            game.toggle_invincible()
         elif name == "FREEZE GHOSTS":
-            self.playfield.set_ghosts_frozen(on)
+            game.toggle_freeze_ghosts()
         elif name == "2x SPEED":
-            self.playfield.set_double_speed(on)
-        elif name == "SKIP LEVEL" and on:
-            self.next_level()
+            game.toggle_fast_player()
+        elif name == "SKIP LEVEL":
+            game.skip_level()
+        self.mirror_cheats()
         return False
 
-    def handle_end_of_level(self, screen) -> bool:
-        """React to the core reporting the level or the run is over.
+    def mirror_cheats(self) -> None:
+        """Copy the core's cheat switches into the menu's display state."""
+        if self.game is None:
+            return
+        cheats = self.game.cheats
+        self.cheats_activated["INVINCIBILITY"] = cheats.invincible
+        self.cheats_activated["FREEZE GHOSTS"] = cheats.freeze_ghosts
+        self.cheats_activated["2x SPEED"] = cheats.fast_player
 
-        Args:
-            screen: the pygame surface to redraw on.
+    def steer(self, key: str) -> bool:
+        """Turn an arrow key into a buffered turn for the player.
+
+        The core keeps the request until the tile it wants is reachable,
+        so a key pressed early is taken at the next junction.  No wall
+        test happens here: the core owns the grid.
 
         Returns:
-            True when the run has ended and the caller should stop playing.
+            True when *key* was an arrow key.
         """
-        if self.playfield is None:
+        wanted = KEY_TO_DIRECTION.get(key)
+        if wanted is None:
             return False
-        if self.playfield.game_over:
-            self.clear(screen)
-            self.game_over(screen)
-            return True
-        if self.playfield.level_cleared:
-            if self.current_level + 1 >= len(self.levels):
-                self.clear(screen)
-                self.winner_screen(screen)
-                return True
-            self.next_level()
-        return False
+        if self.game is not None:
+            self.game.set_direction(wanted)
+        return True
 
-    def clear(self, screen) -> None:
+    def cheat_key(self, key: str) -> None:
+        """Apply the reviewer shortcuts: C toggles cheat mode, F1..F7 act."""
+        game = self.game
+        if game is None:
+            return
+        if key == "c":
+            game.toggle_cheats()
+        actions = {
+            "f1": game.toggle_invincible,
+            "f2": game.toggle_freeze_ghosts,
+            "f3": game.toggle_fast_player,
+            "f4": game.add_life,
+            "f5": game.skip_level,
+            "f6": game.frighten_ghosts,
+            "f7": game.add_time,
+        }
+        action = actions.get(key)
+        if action is not None:
+            action()
+        self.mirror_cheats()
+
+    def clear(self, screen: pygame.Surface) -> None:
         """Fill the window with the background colour."""
         screen.fill(self.colors["void"])
 
-    def next_level(self) -> None:
-        """Advance to the next level, rebuilding the core model with it.
-
-        Raises:
-            IndexError: there is no level after the current one.
-        """
-        self.start_level(self.current_level + 1)
-
-    def draw_line(self, screen, text, y, size, color,
-                  palette=None) -> None:
+    def draw_line(self, screen: pygame.Surface, text: str, y: int,
+                  size: int, color: Color | None,
+                  palette: list[Color] | None = None) -> None:
         """Draw *text* centred horizontally at row *y*.
 
         The size shrinks until the line fits the window.  Laying text out
@@ -1034,241 +1135,41 @@ class Screen:
             step = self.LETTER_W * size + 2
         x = (self.width - len(text) * step) // 2
         for i, char in enumerate(text):
-            self.write_char(char, screen, size, x, y,
-                            color if palette is None
-                            else palette[i % len(palette)])
+            if palette is not None:
+                tint = palette[i % len(palette)]
+            else:
+                tint = color if color is not None else self.colors["white"]
+            self.write_char(char, screen, size, x, y, tint)
             x += step
 
-    def winner_screen(self, screen) -> None:
-        """Every level cleared: a coin, a rainbow line, and the way out."""
+    def end_screen(self, screen: pygame.Surface, victory: bool, score: int,
+                   name: str) -> None:
+        """Draw the end of a run: verdict, final score and name prompt.
+
+        Args:
+            screen: the surface to draw on.
+            victory: True when every level was cleared.
+            score: the final score.
+            name: what the player has typed so far.
+        """
         size = self.TEXT_SIZE + 2
-        glyph_width = len(self.chars["$"][0]) * size
-        self.write_char("$", screen, size,
-                        self.width // 2 - glyph_width // 2,
-                        self.height // 10, self.colors["yellow"])
-
-        self.draw_line(screen, "CONGRATULATIONS - YOU WON!",
-                       self.height // 2, size, None,
-                       palette=list(self.colors.values()))
-        self.draw_line(screen, "Press space to go to the menu...",
-                       self.height // 2 + 100, self.TEXT_SIZE,
-                       self.colors["white"])
-
-    def game_over(self, screen) -> None:
-        """The run ended: red, centred, with the way out spelled out."""
-        self.draw_line(screen, "GAME OVER", self.height // 2,
-                       self.TEXT_SIZE + 2, self.colors["red"])
-        self.draw_line(screen, "Press space to go to the menu...",
-                       self.height // 2 + 70, self.TEXT_SIZE,
-                       self.colors["red"])
-
-    def run(self) -> None:
-
-        # ponytail: only display is needed (no mixer/font).  pygame.init()
-        # would open ALSA on machines with no sound card, blocking ~30s in C
-        # where SIGINT cannot be handled.  Add modules here only if used.
-        pygame.display.init()
-        screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.flip()
-
-        running = True
-        playing = False
-        reading_name = False
-        # Initialised with the rest of the loop state: reading_name is only
-        # ever set where name is assigned, but relying on that made flake8
-        # (rightly) think the name screen could read an unbound name.
-        name = ""
-        # Set once a run starts, so the score is banked exactly once when
-        # it ends.  It used to be saved when the name was typed, while the
-        # score was still 0, and the q key saved a literal 0 -- so scores
-        # never reached players.json at all.
-        banked = False
-        at_home_page = True
-        on_pause = False
-        cheat_on = False
-        pressed_first_cheat = False
-
-        pause_idx = 0
-        menu_idx = 0
-        cheat_idx = 0
-        menu_option = pause_idx % 2
-        cheat_option = cheat_idx % 5
-        selected = menu_idx % len(self.menu_options)
-
-        self.show_menu(screen, menu_idx)
-        last = time.perf_counter()
-
-        while running:
-            now = time.perf_counter()
-            dt = now - last
-            last = now
-            if (playing is True and on_pause is not True
-                    and cheat_on is not True and self.playfield is not None):
-                self.game_loop(screen, dt)
-                if self.handle_end_of_level(screen):
-                    playing = False
-                    if not banked:
-                        self.save_player(name, self.points)
-                        banked = True
-            for event in pygame.event.get():
-                at_home_page = True
-
-                if event.type == pygame.KEYDOWN:
-                    if reading_name:
-                        if not playing and at_home_page and event.key == pygame.K_LEFT:
-                            selected = menu_idx % len(self.menu_options)
-                            self.clear(screen)
-                            self.show_menu(screen, selected)
-                            reading_name = False
-                        if event.key == pygame.K_RETURN:
-                            if self.valid_name(name):
-                                self.start_level(0)
-                                banked = False
-                                self.draw_frame(screen)
-                                playing = True
-                                reading_name = False
-                        elif event.key == pygame.K_BACKSPACE:
-                            name = name[:-1]
-                            self.set_player_name(screen, name)
-                        else:
-                            ch = self.key_chars.get(event.key)
-                            if ch and len(name) < 10:
-                                if ch.isalpha() and event.mod & (pygame.KMOD_SHIFT | pygame.KMOD_CAPS):
-                                    ch = ch.upper()
-                                elif ch == "-" and event.mod & pygame.KMOD_SHIFT:
-                                    ch = "_"
-                                name += ch
-                                self.set_player_name(screen, name)
-                        continue
-
-                    if event.key == pygame.K_q:
-                        # Quitting mid-run still counts: bank the score so
-                        # it is not thrown away, once and only once.
-                        if playing and name and not banked:
-                            self.save_player(name, self.points)
-                            banked = True
-                        running = False
-
-                    elif event.key == pygame.K_DOWN and not playing:
-                        menu_idx += 1
-                        selected = menu_idx % len(self.menu_options)
-                        self.clear(screen)
-                        self.show_menu(screen, selected)
-
-                    elif event.key == pygame.K_UP and not playing:
-                        menu_idx -= 1
-                        selected = menu_idx % len(self.menu_options)
-                        self.clear(screen)
-                        self.show_menu(screen, selected)
-
-                    elif event.key == pygame.K_RETURN and playing is not True:
-                        if self.menu_options[selected] == "Exit":
-                            running = False
-
-                        if self.menu_options[selected] == "Play":
-                            name = ""
-                            reading_name = True
-                            self.set_player_name(screen, name)
-                            at_home_page = False
-
-                        if self.menu_options[selected] == "View Highscores":
-                            self.clear(screen)
-                            self.show_highscores(screen)
-
-                        if self.menu_options[selected] == "Instructions":
-                            self.clear(screen)
-                            self.show_instructions(screen)
-
-                    elif not playing and at_home_page and event.key == pygame.K_LEFT:
-                        selected = menu_idx % len(self.menu_options)
-                        self.clear(screen)
-                        self.show_menu(screen, selected)
-                    elif not playing and event.key == pygame.K_SPACE:
-                        self.clear(screen)
-                        self.show_menu(screen, 0)
-                        on_pause = False
-                        playing = False
-                        self.playfield = None
-
-                    elif playing is True:
-                        if cheat_on is True:
-                            if event.key == pygame.K_RETURN:
-                                if self.toggle_cheat(cheat_option):
-                                    cheat_on = False
-                                else:
-                                    self.clear(screen)
-                                    self.cheat_menu(screen, cheat_option)
-
-                            if event.key == pygame.K_UP:
-                                cheat_idx -= 1
-                                cheat_option = cheat_idx % 5
-                                self.clear(screen)
-                                self.cheat_menu(screen, cheat_option)
-                            if event.key == pygame.K_DOWN:
-                                cheat_idx += 1
-                                cheat_option = cheat_idx % 5
-                                self.clear(screen)
-                                self.cheat_menu(screen, cheat_option)
-                        if pressed_first_cheat is False and event.key == pygame.K_4 and cheat_on is not True:
-                            pressed_first_cheat = True
-                        elif pressed_first_cheat is True and event.key == pygame.K_2:
-                            pressed_first_cheat = False
-                            cheat_on = True
-                            cheat_option = cheat_idx % 5
-                            self.clear(screen)
-                            self.cheat_menu(screen, cheat_option)
-                        elif pressed_first_cheat is True and event.key != pygame.K_2:
-                            pressed_first_cheat = False
-                        if on_pause is True and not cheat_on:
-                            if event.key == pygame.K_UP:
-                                pause_idx -= 1
-                                menu_option = pause_idx % 2
-                                self.clear(screen)
-                                self.pause_menu(screen, menu_option)
-                            if event.key == pygame.K_DOWN:
-                                pause_idx += 1
-                                menu_option = pause_idx % 2
-                                self.clear(screen)
-                                self.pause_menu(screen, menu_option)
-                        if event.key == pygame.K_RETURN and on_pause is True and menu_option == 0:
-                            on_pause = False
-                        elif event.key == pygame.K_RETURN and on_pause is True and menu_option == 1:
-                            self.current_level = 0
-                            self.clear(screen)
-                            self.show_menu(screen, 0)
-                            on_pause = False
-                            playing = False
-                            self.playfield = None
-                        elif event.key == pygame.K_ESCAPE:
-                            self.clear(screen)
-                            self.pause_menu(screen, menu_option)
-                            on_pause = not on_pause
-
-                        if event.key == pygame.K_r:
-                            self.start_level(self.current_level)
-                            self.draw_frame(screen)
-                            playing = True
-                        if event.key == pygame.K_n and self.current_level < len(self.levels) - 1:
-                            self.next_level()
-                            self.draw_frame(screen)
-                            playing = True
-
-                        if self.current_level == len(self.levels) and event.key == pygame.K_SPACE:
-                            self.current_level = 0
-                            self.clear(screen)
-                            self.show_menu(screen, 0)
-                            on_pause = False
-                            playing = False
-                            self.playfield = None
-
-                        # Steering is a request, not a move: the core holds it
-                        # until the tile it wants is reachable, so a key held
-                        # into a wall turns as soon as the opening appears.
-                        # No wall test happens here -- core owns the grid.
-                        wanted = KEY_TO_DIRECTION.get(event.key)
-                        if (wanted is not None and on_pause is not True
-                                and cheat_on is not True
-                                and self.playfield is not None):
-                            self.playfield.steer(wanted)
-
-            pygame.display.flip()
+        top = self.height // 5
+        if victory:
+            glyph_width = len(self.chars["$"][0]) * size
+            self.write_char("$", screen, size,
+                            self.width // 2 - glyph_width // 2,
+                            top - size * 9, self.colors["yellow"])
+            self.draw_line(screen, "CONGRATULATIONS - YOU WON!", top + 30,
+                           size, None, palette=list(self.colors.values()))
+        else:
+            self.draw_line(screen, "GAME OVER", top + 30, size,
+                           self.colors["red"])
+        self.draw_line(screen, f"FINAL SCORE  {score}", top + 130,
+                       self.TEXT_SIZE, self.colors["white"])
+        self.draw_line(screen, "Enter your name", top + 250,
+                       self.TEXT_SIZE, self.colors["gold"])
+        caret = name + "_" if len(name) < 10 else name
+        self.draw_line(screen, caret, top + 320, self.TEXT_SIZE,
+                       self.colors["cyan"])
+        self.draw_line(screen, "ENTER SAVE    ESC SKIP", self.height - 60,
+                       max(2, self.TEXT_SIZE - 2), self.colors["slate"])

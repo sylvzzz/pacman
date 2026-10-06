@@ -35,10 +35,43 @@ make run CONFIG=other.json
 
 The program takes exactly one argument, the path to a configuration file.
 
-<!-- TODO (dbotelho): the key table — movement, pause, quit, menu navigation,
-     and the cheat keys (C to toggle, F1..F7 and what each one does).
-     Required by the subject: cheat mode must be documented here and on the
-     in-game Instructions screen. -->
+### Keys
+
+| Key | Where | Action |
+| --- | --- | --- |
+| Arrows | menus | move the selection (left goes back) |
+| Enter | menus | choose |
+| Arrows | game | steer; a turn pressed early is kept until the junction, and the opposite key reverses at once |
+| Esc | game | pause menu (Resume / Main Menu) |
+| R | game | restart the run from level 1 |
+| Q | menus, game | quit (a run in progress is saved first) |
+| Space / Enter | end screen | back to the menu |
+
+**Cheat mode** (for reviewers; needs `cheats_enabled` in the config). Press
+`C` to turn it on; the keys below do nothing until then, and turning it off
+clears them all. The same toggles are in the cheat menu, opened by pressing
+`4` then `2` while playing.
+
+| Key | Effect |
+| --- | --- |
+| C | cheat mode on / off |
+| F1 | invincible: ghosts cannot hurt you |
+| F2 | freeze the ghosts |
+| F3 | faster player (1.8x) |
+| F4 | one extra life |
+| F5 | skip to the next level |
+| F6 | frighten every ghost, as a super-pacgum does |
+| F7 | add 30 seconds to the level timer |
+
+The same table is on the in-game Instructions screen.
+
+### Pace of the game
+
+The ghosts leave their corners two seconds apart. They alternate between
+*scatter* (each heads for its own corner) and *chase* (each hunts the player
+its own way) for the first minute and chase for good after that. Eating a
+super-pacgum turns every ghost around and makes it edible; ghosts get 4%
+faster each level, up to 40% faster than the configured speed.
 
 ## Resources
 
@@ -157,9 +190,11 @@ pacman/core/          no pygame
 pacman/ui/            imports core
   highscores.py       the top-ten table, saved atomically
   blockfont.py        5x7 glyphs
-  renderer.py         reads game state, writes pixels
-  scenes.py           menu, play, pause, game over, instructions
-  app.py              window, delta-time loop, current scene
+  figures.py          hand-rasterised Pac-Man and ghost sprites
+  maze.py             wall shapes for the 16 cell codes
+  renderer.py         Screen: reads game state, writes pixels
+  scenes.py           menu, name, play (pause, cheats), end, pages
+  app.py              the only other pygame user: window, loop, key names
 ```
 
 A traceback reaching the user is a failing grade, so every error the user

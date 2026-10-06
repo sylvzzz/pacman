@@ -10,7 +10,8 @@ import pytest
 
 from pacman.core.config import GameConfig
 from pacman.core.entities import Direction, Ghost, GhostState, Personality
-from pacman.core.game import MAX_DT, Game, Phase
+from pacman.core.game import (LEVEL_SPEED_STEP, MAX_DT, MAX_LEVEL_SPEED,
+                              MODE_SCHEDULE, RELEASE_STAGGER, Game, Phase)
 from pacman.core.level import Level
 
 HALL_ROWS = (
@@ -395,3 +396,44 @@ def test_skip_level_wins(game: Game) -> None:
     game.toggle_cheats()
     game.skip_level()
     assert phase_of(game) is Phase.LEVEL_WON
+
+
+# --- pacing: release, scatter/chase, level speed ------------------------
+
+def test_ghosts_leave_home_one_after_another(
+        small_config: GameConfig) -> None:
+    """Each ghost waits RELEASE_STAGGER longer than the one before."""
+    g = Game(small_config, random.Random(1))
+    delays = [ghost.release_timer for ghost in g.ghosts]
+    assert delays == [i * RELEASE_STAGGER for i in range(4)]
+
+
+def test_waiting_ghost_stays_on_its_tile(game: Game) -> None:
+    """Until its timer ends a ghost does not move."""
+    game.ghosts = [Ghost((9, 1), game.config.ghost_speed,
+                         Personality.CHASER)]
+    game.ghosts[0].release_timer = 1.0
+    run(game, 0.5)
+    assert game.ghosts[0].tile == (9, 1)
+    assert game.ghosts[0].target is None
+
+
+def test_scatter_then_chase_schedule(game: Game) -> None:
+    """The first phase is scatter; chase follows; the last one is chase."""
+    game.mode_time = 0.0
+    assert game.scattering
+    game.mode_time = MODE_SCHEDULE[0][0] + 1.0
+    assert not game.scattering
+    game.mode_time = sum(a + b for a, b in MODE_SCHEDULE) + 100.0
+    assert not game.scattering
+
+
+def test_ghosts_get_faster_each_level(small_config: GameConfig) -> None:
+    """Level 2 ghosts are quicker than level 1, but never past the cap."""
+    g = Game(small_config, random.Random(1))
+    first = g.ghost_speed
+    g._load_level(1, 3)
+    assert g.ghost_speed == pytest.approx(
+        small_config.ghost_speed * (1 + LEVEL_SPEED_STEP))
+    assert g.ghost_speed > first
+    assert g.ghost_speed <= small_config.ghost_speed * MAX_LEVEL_SPEED

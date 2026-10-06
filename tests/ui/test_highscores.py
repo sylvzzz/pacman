@@ -1,140 +1,133 @@
-"""Tests for the highscore store behind pacman.ui.renderer's Screen.
+"""Tests for pacman.ui.highscores.
 
 Owner: Person B
 
-``save_player`` is the only thing standing between a finished run and a
-leaderboard, and it is pure file I/O over a dict, so it is worth pinning
-down: a regression here is silent -- the game looks fine and the scores
-just quietly stop moving.  These run against a real temp file rather than
-a mock, because the bug that matters is the round trip through JSON.
+These run against real temporary files rather than mocks: the bugs that
+matter are the round trip through JSON and a crash mid-write.
 """
 
 import json
-import os
 from pathlib import Path
 
 import pytest
 
-from pacman import core
-from pacman.ui.renderer import Screen
-
-# Resolved before the fixture chdir's into a temp directory: the tests move
-# the working directory to give save_player a throwaway leaderboard.
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-CONFIG = core.load_config(os.path.join(REPO, "config.json"))
+from pacman.core.errors import HighscoreError
+from pacman.ui.highscores import (MAX_ENTRIES, HighscoreEntry,
+                                  HighscoreTable, is_valid_name,
+                                  is_valid_score, sanitize_name)
 
 
 @pytest.fixture
-def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Screen:
-    """A Screen plus an empty players.json in a throwaway cwd."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "players.json").write_text("{}")
-    return Screen(CONFIG)
+def table(tmp_path: Path) -> HighscoreTable:
+    """An empty table bound to a file in a temporary directory."""
+    return HighscoreTable(str(tmp_path / "scores.json"))
 
 
-def read(path: Path) -> dict:
-    """Return the parsed leaderboard."""
-    return json.loads(path.read_text())
+def test_sanitize_keeps_letters_digits_and_spaces() -> None:
+    """Anything else is dropped, and the name is cut at ten characters."""
+    assert sanitize_name("a-b_c!d e1") == "abcd e1"
+    assert sanitize_name("abcdefghijklmnop") == "abcdefghij"
+    assert sanitize_name("  ") == ""
 
 
-def test_first_run_creates_the_entry(tmp_path: Path, store: Screen) -> None:
-    """A name that has never played starts a record at the score given."""
-    store.save_player("ana", 120)
-    assert read(tmp_path / "players.json") == {"ana": {"score": 120}}
+def test_name_and_score_validation() -> None:
+    """Names are 1..10 safe characters; scores are non-negative ints."""
+    assert is_valid_name("ana 2")
+    assert not is_valid_name("")
+    assert not is_valid_name("a" * 11)
+    assert not is_valid_name("ana!")
+    assert is_valid_score(0) and is_valid_score(300)
+    assert not is_valid_score(-1)
+    assert not is_valid_score(True)
+    assert not is_valid_score("5")
 
 
-def test_second_run_adds_to_the_record(tmp_path: Path, store: Screen) -> None:
-    """Scores accumulate across runs rather than being overwritten.
-
-    This is the whole point of the store, and it is what a plain
-    ``players[name] = {...}`` would quietly break.
-    """
-    store.save_player("ana", 120)
-    store.save_player("ana", 80)
-    assert read(tmp_path / "players.json") == {"ana": {"score": 200}}
+def test_missing_file_is_an_empty_table(table: HighscoreTable) -> None:
+    """A first run has no file; that is not an error."""
+    table.load()
+    assert table.entries == []
 
 
-def test_other_players_are_untouched(tmp_path: Path, store: Screen) -> None:
-    """Saving one player must not drop anybody else from the board."""
-    store.save_player("ana", 120)
-    store.save_player("bruno", 300)
-    store.save_player("ana", 30)
-    assert read(tmp_path / "players.json") == {
-        "ana": {"score": 150}, "bruno": {"score": 300}}
+@pytest.mark.parametrize("content", ["", "{not json", "{}", "42", '"x"'])
+def test_corrupt_file_is_an_empty_table(
+        table: HighscoreTable, content: str) -> None:
+    """Bad JSON or the wrong shape never stops the game."""
+    table.path.write_text(content)
+    table.load()
+    assert table.entries == []
 
 
-def test_a_zero_score_run_is_still_recorded(
-        tmp_path: Path, store: Screen) -> None:
-    """Dying on the first pellet should not silently skip the leaderboard."""
-    store.save_player("ana", 0)
-    assert read(tmp_path / "players.json") == {"ana": {"score": 0}}
+def test_bad_rows_are_skipped(table: HighscoreTable) -> None:
+    """Valid rows survive next to rows with a bad name or score."""
+    table.path.write_text(json.dumps([
+        {"name": "ana", "score": 10},
+        {"name": "bad!", "score": 10},
+        {"name": "bob", "score": -4},
+        {"name": "cy", "score": "9"},
+        "junk",
+        {"name": "dee", "score": 30},
+    ]))
+    table.load()
+    assert table.entries == [HighscoreEntry("dee", 30),
+                             HighscoreEntry("ana", 10)]
 
 
-def test_existing_entries_survive_a_bad_shape(
-        tmp_path: Path, store: Screen) -> None:
-    """A hand-edited file with extra keys still loads and keeps them."""
-    path = tmp_path / "players.json"
-    path.write_text(json.dumps({"ana": {"score": 10, "lives": 3}}))
-    store.save_player("bruno", 5)
-    stored = read(path)
-    assert stored["bruno"] == {"score": 5}
-    assert stored["ana"]["lives"] == 3
+def test_add_sorts_best_first(table: HighscoreTable) -> None:
+    """The table is always ordered from the highest score down."""
+    for name, score in (("a", 10), ("b", 30), ("c", 20)):
+        assert table.add(name, score)
+    assert [e.score for e in table.entries] == [30, 20, 10]
 
 
-def test_the_board_is_ranked_by_score(tmp_path: Path, store: Screen) -> None:
-    """Ranking is what show_highscores displays, so check the ordering."""
-    store.save_player("ana", 120)
-    store.save_player("bruno", 900)
-    store.save_player("carla", 45)
-    players = read(tmp_path / "players.json")
-    ranked = sorted(players.items(), key=lambda i: i[1]["score"],
-                    reverse=True)
-    assert [name for name, _ in ranked] == ["bruno", "ana", "carla"]
+def test_table_keeps_only_the_top_ten(table: HighscoreTable) -> None:
+    """The eleventh score pushes the lowest out; a worse one is refused."""
+    for i in range(MAX_ENTRIES):
+        table.add(f"p{i}", (i + 1) * 100)
+    assert not table.add("low", 50)
+    assert table.add("top", 5000)
+    assert len(table.entries) == MAX_ENTRIES
+    assert table.entries[0].name == "top"
+    assert all(e.score > 100 for e in table.entries)
 
 
-def drawn_lines(screen_obj: Screen,
-                monkeypatch: pytest.MonkeyPatch) -> list:
-    """Run show_highscores, capturing every line it would have drawn.
-
-    Capturing the text is the only way to check the *ranking*: the pixels
-    say nothing about which score is on which row.
-    """
-    import pygame
-
-    drawn: list = []
-    monkeypatch.setattr(
-        screen_obj, "draw_line",
-        lambda s, text, y, size, color, palette=None: drawn.append(text))
-    screen_obj.show_highscores(pygame.Surface((screen_obj.width,
-                                              screen_obj.height)))
-    return drawn
+def test_add_rejects_an_empty_name_or_bad_score(
+        table: HighscoreTable) -> None:
+    """Nothing invalid reaches the file."""
+    assert not table.add("!!!", 10)
+    assert not table.add("ana", -1)
+    assert table.entries == []
 
 
-def test_board_shows_the_ten_highest_not_the_first_ten(
-        tmp_path: Path, store: Screen,
-        monkeypatch: pytest.MonkeyPatch) -> None:
-    """Rank by score, then cap.  The reverse order is the trap.
-
-    This file lists the worst player first on purpose: taking the first
-    ten keys instead of the ten highest scores renders a leaderboard that
-    looks plausible and is entirely wrong.
-    """
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "players.json").write_text(json.dumps(
-        {f"p{i:02d}": {"score": i * 100} for i in range(15)}))
-
-    lines = drawn_lines(store, monkeypatch)
-
-    assert lines[0] == "Top 10 Highest Scores"
-    assert len(lines) == 11, "expected a title and exactly ten rows"
-    assert lines[1] == "1  -  p14  -  1400"
-    assert lines[10] == "10  -  p05  -  500"
+def test_save_and_load_round_trip(table: HighscoreTable) -> None:
+    """What is saved is what comes back."""
+    table.add("ana", 120)
+    table.add("bob", 80)
+    table.save()
+    again = HighscoreTable(str(table.path))
+    again.load()
+    assert again.entries == table.entries
 
 
-def test_an_empty_board_draws_just_the_title(
-        tmp_path: Path, store: Screen,
-        monkeypatch: pytest.MonkeyPatch) -> None:
-    """Nobody has played yet: that is a title, not a crash."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "players.json").write_text("{}")
-    assert drawn_lines(store, monkeypatch) == ["Top 10 Highest Scores"]
+def test_save_leaves_no_temporary_file(
+        table: HighscoreTable, tmp_path: Path) -> None:
+    """The temp file is renamed over the target, not left behind."""
+    table.add("ana", 1)
+    table.save()
+    assert [p.name for p in tmp_path.iterdir()] == ["scores.json"]
+
+
+def test_save_failure_is_a_highscore_error(tmp_path: Path) -> None:
+    """An unwritable location raises the project's own error."""
+    table = HighscoreTable(str(tmp_path / "missing" / "scores.json"))
+    table.add("ana", 1)
+    with pytest.raises(HighscoreError):
+        table.save()
+
+
+def test_qualifies(table: HighscoreTable) -> None:
+    """Any score fits an empty table; a full one needs to beat the last."""
+    assert table.qualifies(0)
+    for i in range(MAX_ENTRIES):
+        table.add(f"p{i}", 100 + i)
+    assert not table.qualifies(100)
+    assert table.qualifies(101)

@@ -21,9 +21,9 @@ venv/
 CLAUDE.md
 subject.md
 
-project_management/
 vendor/
 
 players.json
+highscores.json
 notes.txt
 table.md

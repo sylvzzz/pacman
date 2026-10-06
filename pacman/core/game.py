@@ -37,7 +37,13 @@ SUBSTEP = 0.02               # longest slice simulated at once, seconds
 COLLISION_DISTANCE = 0.6     # Manhattan distance, in tiles
 LEVEL_CLEAR_TIME = 1.5       # how long LEVEL_WON is shown, seconds
 FRIGHTENED_SPEED_FACTOR = 0.5
-CHEAT_SPEED_FACTOR = 1.6
+RELEASE_STAGGER = 2.0        # extra seconds each ghost waits at home
+LEVEL_SPEED_STEP = 0.04      # ghosts get 4% faster each level...
+MAX_LEVEL_SPEED = 1.4        # ...up to this factor
+# Alternating (scatter, chase) seconds; after the last pair it is chase
+# for good, like the arcade.
+MODE_SCHEDULE = ((7.0, 20.0), (7.0, 20.0), (5.0, 20.0), (5.0, 0.0))
+CHEAT_SPEED_FACTOR = 1.8
 CHEAT_TIME_BONUS = 30.0
 MAX_SEED = 2 ** 31 - 1
 PERSONALITIES = (Personality.CHASER, Personality.AMBUSHER,
@@ -106,6 +112,7 @@ class Game:
         self._rng = rng if rng is not None else random.Random()
         self.level_count = len(config.levels)
         self.cheats = Cheats()
+        self.mode_time = 0.0
         self.score = 0
         self.phase = Phase.READY
         self.level_index = 0
@@ -150,6 +157,28 @@ class Game:
                   PERSONALITIES[i % len(PERSONALITIES)])
             for i, home in enumerate(level.ghost_spawns)]
         self.time_left = self.config.level_max_time
+        self.ghost_speed = self.config.ghost_speed * min(
+            MAX_LEVEL_SPEED, 1.0 + LEVEL_SPEED_STEP * index)
+        self._stagger_ghosts()
+
+    def _stagger_ghosts(self) -> None:
+        """Make the ghosts leave home one after another, and restart modes."""
+        self.mode_time = 0.0
+        for i, ghost in enumerate(self.ghosts):
+            ghost.release_timer = i * RELEASE_STAGGER
+
+    @property
+    def scattering(self) -> bool:
+        """Return True while the ghosts are in a scatter phase."""
+        clock = self.mode_time
+        for scatter, chase in MODE_SCHEDULE:
+            if clock < scatter:
+                return True
+            clock -= scatter
+            if clock < chase:
+                return False
+            clock -= chase
+        return False
 
     def _begin_ready(self) -> None:
         """Freeze for ``ready_time``; with none configured, play now."""
@@ -282,17 +311,16 @@ class Game:
     def _move_player(self, dt: float) -> None:
         """Move the player and eat whatever is on the tile it reached.
 
-        ``tile`` is the last tile *arrived* on, even when the player has
-        already set off toward the next one, so a slice that crosses a
-        tile boundary still eats it.  ``SUBSTEP`` keeps a slice under
-        one tile, so none is ever skipped.
+        The tile eaten is the one the player is nearest to (within half
+        a tile), which stays right after an instant U-turn.  ``SUBSTEP``
+        keeps a slice well under half a tile, so none is ever skipped.
         """
         speed = self.config.player_speed
         if self.cheats.fast_player:
             speed *= CHEAT_SPEED_FACTOR
         self.player.speed = speed
         self.player.update(dt, self.level)
-        tile = self.player.tile
+        tile = self.player.nearest_tile
         if tile in self.level.pacgums:
             self.level.pacgums.discard(tile)
             self.score += self.config.points_per_pacgum
@@ -308,11 +336,12 @@ class Game:
 
     def _move_ghosts(self, dt: float) -> None:
         """Run the ghost timers, then move each ghost unless frozen."""
+        self.mode_time += dt
         for ghost in self.ghosts:
             ghost.tick(dt)
-            if self.cheats.freeze_ghosts:
+            if self.cheats.freeze_ghosts or ghost.release_timer > 0:
                 continue
-            ghost.speed = self.config.ghost_speed
+            ghost.speed = self.ghost_speed
             if ghost.state is GhostState.FRIGHTENED:
                 ghost.speed *= FRIGHTENED_SPEED_FACTOR
             ghost.advance(dt, self.level, self._picker(ghost))
@@ -320,7 +349,7 @@ class Game:
     def _picker(self, ghost: Ghost) -> Callable[[], Direction | None]:
         """Return the callback asking the AI where *ghost* goes next."""
         return lambda: choose_ghost_direction(
-            ghost, self.level, self.player, self._rng)
+            ghost, self.level, self.player, self._rng, self.scattering)
 
     def _touches(self, ghost: Ghost) -> bool:
         """Return True when *ghost* is close enough to hit the player."""
@@ -364,6 +393,7 @@ class Game:
         self.player.reset(self.level.player_spawn)
         for ghost, home in zip(self.ghosts, self.level.ghost_spawns):
             ghost.reset(home)
+        self._stagger_ghosts()
         self._begin_ready()
 
     def _win_level(self) -> None:

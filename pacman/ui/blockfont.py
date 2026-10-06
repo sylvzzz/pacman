@@ -6,8 +6,12 @@ pixel. Covers A-Z, a-z, 0-9 and space, enough for menus, the HUD and
 highscore names (alphanumeric + spaces only, subject V.5).
 """
 
+
 class Character:
-    def __init__(self, char) -> None:    
+    """The 5x7 glyph table, plus helpers to print one glyph as text."""
+
+    def __init__(self, char: str) -> None:
+        """Select *char*; ``chars`` holds every glyph."""
         self.char = char
         self.chars: dict[str, tuple[str, ...]] = {
             " ": (".....",) * 7,
@@ -631,25 +635,22 @@ class Character:
                 "....############....",
             ),
         }
-    
-    def draw_char(self, char) -> None:
+
+    def draw_char(self, char: tuple[str, ...]) -> None:
+        """Print one glyph to the terminal (a debugging aid)."""
         for row in char:
-            for bit in row:
-                print(bit, end="")
-            print()
+            print(row)
 
     @property
-    def bits(self) -> list:
-        return self.chars.get(self.char, "")
+    def bits(self) -> tuple[str, ...]:
+        """Return the glyph of the selected character, empty if unknown."""
+        return self.chars.get(self.char, ())
 
-    def write(self, chars) -> None:
-        try:
-            for ch in chars:
-                self.draw_char(self.char[ch])
-        except:
-             print("This character is invalid...")
-
-
-if __name__ == "__main__":
-    C = Character()
-    C.write("Pac-Man")
+    def write(self, chars: str) -> None:
+        """Print each character of *chars* as a glyph to the terminal."""
+        for ch in chars:
+            glyph = self.chars.get(ch)
+            if glyph is None:
+                print("This character is invalid...")
+                return
+            self.draw_char(glyph)

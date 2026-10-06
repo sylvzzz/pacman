@@ -9,7 +9,18 @@ Arrow Left - Go back
 
           GAME
 -----------------------------
-Arrow Up/Down/Left/Right - Movement
-********* - CHEAT MENU
-ESC - Pause menu
+Arrows or WASD - Movement
+4 then 2 - Cheat menu
+C - Cheat mode on/off (reviewers)
+F1 invincible  F2 freeze ghosts  F3 fast
+F4 +1 life  F5 skip level  F6 scare  F7 +30s
+R - Restart run
+ESC - Pause menu (Resume / Main menu)
+Q - Quit
 Enter - Select menu option
+
+   WHEN THE RUN ENDS
+-----------------------------
+Type your name (10 letters, digits
+or spaces) and press Enter to save
+your score. ESC skips saving.

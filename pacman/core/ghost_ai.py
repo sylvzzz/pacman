@@ -75,7 +75,8 @@ def _best_by_distance(ghost: Ghost, options: list[Direction],
 
 
 def choose_ghost_direction(ghost: Ghost, level: Level, player: Player,
-                           rng: random.Random) -> Direction | None:
+                           rng: random.Random,
+                           scatter: bool = False) -> Direction | None:
     """Decide where *ghost* goes from the tile it is standing on.
 
     Args:
@@ -83,6 +84,9 @@ def choose_ghost_direction(ghost: Ghost, level: Level, player: Player,
         level: the maze, providing BFS distance maps.
         player: the player to chase or flee from.
         rng: random source for tie-breaks and whims.
+        scatter: True during a scatter phase: a normal ghost heads for
+            its home corner instead of chasing, which gives the player
+            breathing room.
 
     Returns:
         A direction into an open tile, or None when the ghost stays
@@ -101,5 +105,8 @@ def choose_ghost_direction(ghost: Ghost, level: Level, player: Player,
     if (ghost.personality is Personality.WHIMSICAL
             and rng.random() < WHIMSICAL_RANDOM_CHANCE):
         return rng.choice(options)
+    if scatter:
+        distances = level.distances_from(ghost.home)
+        return _best_by_distance(ghost, options, distances, rng, True)
     distances = level.distances_from(chase_target(ghost, level, player))
     return _best_by_distance(ghost, options, distances, rng, True)

@@ -21,6 +21,7 @@ IMPORT_ERROR: ImportError | None
 __all__ = ["Logger", "IMPORT_ERROR"]
 
 try:
+    from pacman.ui.app import App
     from pacman.ui.renderer import Screen
     from pacman.ui.blockfont import Character
     from pacman.ui.maze import Wall, WallStatus, Directions
@@ -29,5 +30,5 @@ except ImportError as exc:  # pygame / mazegenerator not installed
     IMPORT_ERROR = exc
 else:
     IMPORT_ERROR = None
-    __all__ += ["Screen", "Character", "Wall", "WallStatus", "Directions",
-                "CreatureType"]
+    __all__ += ["App", "Screen", "Character", "Wall", "WallStatus",
+                "Directions", "CreatureType"]

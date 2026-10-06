@@ -27,13 +27,13 @@ def parse_arguments(
     if not args or args[0] in ("-h", "--help"):
         raise UsageError("Usage: python3 pac-man.py <config.json>")
 
-    config_path = args[0]
-    try:
-        config = core.load_config(config_path)
-    except Exception as exc:  # pragma: no cover
-        raise UsageError(f"Invalid config file: {exc}") from exc
+    if len(args) > 1:
+        raise UsageError("Usage: python3 pac-man.py <config.json>")
 
-    return config_path, config
+    config_path = args[0]
+    # A bad file raises ConfigError (a PacManError); main() turns it into
+    # a message and exit code 1, while a bad command line is code 2.
+    return config_path, core.load_config(config_path)
 
 
 def check_dependencies() -> None:
@@ -58,17 +58,22 @@ def main() -> None:
     check_dependencies()
 
     try:
-        config_path, config = parse_arguments()
+        _, config = parse_arguments()
     except UsageError as exc:
         Logger.error(f"{exc}")
         sys.exit(2)
+    except core.PacManError as exc:
+        Logger.error(f"Error: {exc}")
+        sys.exit(1)
 
     try:
-        screen = ui.Screen(config)
-        screen.run()
+        ui.App(config).run()
     except KeyboardInterrupt:
         Logger.error("\nGame interrupted by user ...")
         sys.exit(130)
+    except core.PacManError as exc:
+        Logger.error(f"Error: {exc}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

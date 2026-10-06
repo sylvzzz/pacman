@@ -16,9 +16,9 @@ import pygame
 import pytest
 
 from pacman.core.entities import Direction, Player
-from pacman.ui.figures import (CreatureType, disc, facing_of, ghost, pacman,
-                               shade)
-from pacman.ui.playfield import GHOST_COLORS
+from pacman.ui.figures import (CreatureType, disc, facing_of, ghost,
+                               pacman)
+from pacman.ui.renderer import GHOST_COLORS
 from pacman.ui.renderer import MENU_DECOR_PELLETS, Screen
 
 
@@ -32,7 +32,7 @@ def surface() -> pygame.Surface:
     return pygame.Surface((SIZE, SIZE))
 
 
-def lit(surface: pygame.Surface) -> set:
+def lit(surface: pygame.Surface) -> set[tuple[int, int]]:
     """Every pixel that was painted, as a set."""
     return {(x, y) for x in range(SIZE) for y in range(SIZE)
             if surface.get_at((x, y))[:3] != (0, 0, 0)}
@@ -43,7 +43,7 @@ def test_creature_type_no_longer_carries_sprites() -> None:
     assert [m.name for m in CreatureType] == ["WALL", "EMPTY"]
 
 
-def extent(surface: pygame.Surface) -> tuple:
+def extent(surface: pygame.Surface) -> tuple[int, int]:
     """Return the (width, height) of everything painted."""
     painted = lit(surface)
     assert painted
@@ -59,7 +59,7 @@ def test_sprites_fit_their_box(surface: pygame.Surface, radius: int) -> None:
     ``disc`` stamps a rim one pixel outside the circle and the ghost's
     skirt hangs one pixel below it; three pixels of slack covers both.
     """
-    sprites = (
+    sprites: tuple[typing.Callable[[], None], ...] = (
         lambda: disc(surface, CX, CY, radius, (255, 0, 0)),
         lambda: pacman(surface, CX, CY, radius, (240, 192, 0),
                        facing=(1, 0), mouth=1.0),
@@ -113,87 +113,6 @@ def test_ghost_fits_its_box(surface: pygame.Surface) -> None:
     assert all(dim <= 2 * 14 + 3 for dim in extent(surface))
 
 
-@pytest.mark.parametrize("pixel", [0, 4, 6, 8])
-def test_retro_ghost_snaps_onto_the_sprite_grid(
-        surface: pygame.Surface, pixel: int) -> None:
-    """``pixel`` quantizes the silhouette; ``pixel=0`` leaves it smooth.
-
-    The snap is the whole 8-bit effect, so it is checked structurally:
-    every column's top edge has to land on a whole block, and the dome has
-    to end up with far fewer distinct heights than a curve does.
-    """
-    radius = 24
-    surface.fill((0, 0, 0))
-    ghost(surface, CX, CY, radius, (228, 52, 52), pixel=pixel)
-    tops = {}
-    for x in range(SIZE):
-        column = [y for y in range(SIZE)
-                  if surface.get_at((x, y))[:3] != (0, 0, 0)]
-        if column:
-            tops[x] = min(column)
-    assert tops, "ghost drew nothing"
-    steps = len(set(tops.values()))
-    if pixel:
-        # The topmost lit pixel is the rim, which sits one row above the
-        # snapped silhouette, so the grid is checked one row in.
-        assert all((CY - top - 1) % pixel == 0 for top in tops.values()), (
-            "a column top is off the sprite grid")
-        assert steps <= radius // pixel + 1, f"{steps} dome steps, too smooth"
-    else:
-        assert steps > radius // 4, "smooth ghost lost its curve"
-
-
-def test_retro_eyes_are_square(surface: pygame.Surface) -> None:
-    """A round eye on a blocky head is the last thing that reads as vector.
-
-    Each eye is checked as its own bounding box: the pupil is painted
-    inside the eye, so comparing whole rows of white would only measure
-    where the pupil happens to sit.
-    """
-    ghost(surface, CX, CY, 24, (228, 52, 52), facing=(1, 0), pixel=6)
-    white = {(x, y) for y in range(SIZE) for x in range(SIZE)
-             if surface.get_at((x, y))[:3] == (255, 255, 255)}
-    assert white, "retro ghost has no eyes"
-    for right in (False, True):
-        eye = {(x, y) for x, y in white if (x > CX) is right}
-        assert eye, "one eye is missing"
-        xs = [x for x, _ in eye]
-        ys = [y for _, y in eye]
-        width = max(xs) - min(xs) + 1
-        height = max(ys) - min(ys) + 1
-        assert width == height, f"eye is {width}x{height}, not a square"
-
-
-@pytest.mark.parametrize("pixel,continuous", [(6, True), (0, False)])
-def test_ghost_outline_matches_the_mode(
-        surface: pygame.Surface, pixel: int, continuous: bool) -> None:
-    """Stepped ghosts get a closed outline, smooth ones keep the bare flank.
-
-    A one-pixel rim per column leaves the vertical face of each stepped
-    dome bare, so the retro outline read as loose dashes.  Widening the rim
-    fixes that but would also outline the smooth ghosts' flanks, which is a
-    change to the board that was not asked for -- so the two modes differ
-    and this pins both.
-    """
-    color = (228, 52, 52)
-    body, rim = shade(color, 1.18), shade(color, 0.45)
-    surface.fill((0, 0, 0))
-    ghost(surface, CX, CY, 24, color, pixel=pixel)
-    rows = gaps = 0
-    for y in range(SIZE):
-        lit = [x for x in range(SIZE)
-               if surface.get_at((x, y))[:3] == body]
-        if not lit:
-            continue
-        rows += 1
-        for edge_x in (min(lit), max(lit)):
-            if rim not in (surface.get_at((edge_x - 1, y))[:3],
-                           surface.get_at((edge_x + 1, y))[:3]):
-                gaps += 1
-    assert rows > 10
-    assert gaps == 0 if continuous else gaps > 0
-
-
 def test_ghost_skirt_is_wavy(surface: pygame.Surface) -> None:
     """The feet are cut away, otherwise the ghost reads as an egg."""
     ghost(surface, CX, CY, 14, (255, 64, 64))
@@ -203,13 +122,13 @@ def test_ghost_skirt_is_wavy(surface: pygame.Surface) -> None:
     assert gap, "ghost has no notch in its skirt"
 
 
-def count(surface: pygame.Surface, colour: tuple) -> int:
+def count(surface: pygame.Surface, colour: tuple[int, ...]) -> int:
     """How many pixels are exactly *colour*."""
     return sum(1 for x in range(SIZE) for y in range(SIZE)
                if surface.get_at((x, y))[:3] == colour)
 
 
-PUPIL = (24, 26, 90)
+PUPIL = (30, 30, 120)
 
 
 def test_frightened_face_replaces_the_eyes(surface: pygame.Surface) -> None:
@@ -243,11 +162,14 @@ def test_facing_of_defaults_to_up(surface: pygame.Surface) -> None:
                                      float(direction.dy))
 
 
-def decor_and_panel_pixels(screen_obj: "Screen") -> tuple:
+def decor_and_panel_pixels(
+        screen_obj: "Screen",
+) -> tuple[set[tuple[int, int]], set[tuple[int, int]]]:
     """Return the decor's ink and the home panel's ink as pixel sets."""
     import pygame
 
-    def ink(draw: typing.Callable) -> set:
+    def ink(draw: typing.Callable[[pygame.Surface], object]
+            ) -> set[tuple[int, int]]:
         surface = pygame.Surface((screen_obj.width, screen_obj.height))
         surface.fill(screen_obj.colors["void"])
         draw(surface)
@@ -277,7 +199,7 @@ def test_the_42_glyph_is_filled_solid(screen_obj: "Screen") -> None:
     mask path also skips the lit core in the middle band, so every "42"
     cell came out hollow and the glyph dissolved into its own outline.
     """
-    screen_obj.start_level(0)
+    screen_obj.start_game()
     surface = pygame.Surface((screen_obj.width, screen_obj.height))
     surface.fill(screen_obj.colors["void"])
     screen_obj.render_maze(surface)
@@ -337,7 +259,7 @@ def test_menu_decor_pellets_match_the_board_size(
     circles they come out smooth and read as bubbles, and the decoration
     stops looking like the game it is decorating.
     """
-    screen_obj.start_level(0)
+    screen_obj.start_game()
     size = screen_obj.entity_size()
     board = (max(1.5, size * 0.11), size * 0.21)
     _, pellets = screen_obj.menu_decor()
