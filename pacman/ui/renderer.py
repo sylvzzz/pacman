@@ -65,8 +65,10 @@ KEY_TO_DIRECTION = {
     "d": Direction.RIGHT,
 }
 
-# Function keys of the reviewer cheat mode, by name.
-CHEAT_FUNCTION_KEYS = ("f1", "f2", "f3", "f4", "f5", "f6", "f7")
+# The key that opens the cheat menu, and the key of each row in it, in
+# the same order as ``Screen.cheat_options``.
+CHEAT_MENU_KEY = "c"
+CHEAT_KEYS = ("l", "i", "s", "f", "g", "n", "t")
 
 # Sprite diameter, in pixels, of the player, a ghost and a pellet.  Kept
 # just under the corridor so entities never overlap a wall.
@@ -139,8 +141,9 @@ class Screen:
 
         # Create a simple 20x20 maze
         self.current_level = 0
-        self.cheat_options = ["INVINCIBILITY", "SKIP LEVEL",
-                              "FREEZE GHOSTS", "2x SPEED", "EXIT"]
+        self.cheat_options = ["MORE LIVES", "INVINCIBILITY", "2x SPEED",
+                              "FREEZE GHOSTS", "SCARE GHOSTS",
+                              "SKIP LEVEL", "+30S"]
         self.levels = config.levels
         self.seed = config.seed
         self.mw, self.mh = (self.levels[self.current_level].width,
@@ -183,12 +186,9 @@ class Screen:
 
         self.menu_options = ["Play", "View Highscores", "Instructions", "Exit"]
         self._decor: tuple[list[Any], list[Any]] | None = None
-        self.cheats_activated = {
-            "INVINCIBILITY": False,
-            "SKIP LEVEL": False,
-            "FREEZE GHOSTS": False,
-            "2x SPEED": False,
-        }
+        # ON/OFF state of every row in the cheat menu, keyed by option.
+        # ON means the cheat's key is unlocked while playing.
+        self.cheats_activated = dict.fromkeys(self.cheat_options, False)
 
     def _populate_cells(self) -> dict[int, dict[int, CreatureType]]:
         """Mark every cell as wall or corridor.
@@ -436,17 +436,19 @@ class Screen:
 
     def cheat_menu(self, screen: pygame.Surface,
                    selected: int = -1) -> None:
-        """Draw the cheat list with each toggle's state beside its option."""
+        """Draw the cheat list with each option's ON/OFF state.
+
+        ON means the cheat's key is unlocked while playing.  *selected*
+        is the highlight the arrows move; enter arms or disarms the row
+        it is on, and the row's own letter runs the cheat from anywhere.
+        """
         suffixes = []
         for name in self.cheat_options:
-            if name == "EXIT":
-                suffixes.append(("", self.colors["slate"]))
-            else:
-                on = self.cheats_activated[name]
-                suffixes.append(("ON" if on else "OFF", self.colors["green"]
-                                 if on else self.colors["red"]))
+            on = self.cheats_activated[name]
+            suffixes.append(("ON" if on else "OFF", self.colors["green"]
+                             if on else self.colors["red"]))
         self.draw_panel(screen, "CHEATS", self.cheat_options, selected,
-                        "ARROWS MOVE    ENTER TOGGLE    ESC BACK", None,
+                        "ARROWS MOVE    ENTER ARM    C BACK", None,
                         suffixes)
 
     def instruction_lines(self) -> list[str]:
@@ -1052,47 +1054,27 @@ class Screen:
                     ((self.width - width) // 2, y, width, height))
         self.draw_line(screen, text, y + size * 2, size, color)
 
-    def toggle_cheat(self, index: int) -> bool:
-        """Toggle the cheat at *index* and push the effect into the core.
+    def toggle_cheat(self, index: int) -> None:
+        """Arm or disarm the key of the cheat at *index* (Enter/click).
 
-        The rules live in ``Game``; this only forwards the request and
-        then mirrors the switches it reports, so the menu can never show
-        a state the model does not have.  A config with
-        ``cheats_enabled`` false leaves ``Game`` ignoring all of it.
+        This only flips the ON/OFF state shown in the menu; the cheat
+        itself runs from its own letter while the row is ON.  The first
+        arm of a run turns the core's master switch on; a config with
+        ``cheats_enabled`` false leaves ``Game`` ignoring all of it, so
+        no row lights up.
 
         Args:
             index: position in ``cheat_options``.
-
-        Returns:
-            True for EXIT, meaning the cheat menu should close.
         """
-        name = self.cheat_options[index]
-        if name == "EXIT":
-            return True
         game = self.game
         if game is None:
-            return False
+            return
         if not game.cheats.active:
             game.toggle_cheats()
-        if name == "INVINCIBILITY":
-            game.toggle_invincible()
-        elif name == "FREEZE GHOSTS":
-            game.toggle_freeze_ghosts()
-        elif name == "2x SPEED":
-            game.toggle_fast_player()
-        elif name == "SKIP LEVEL":
-            game.skip_level()
-        self.mirror_cheats()
-        return False
-
-    def mirror_cheats(self) -> None:
-        """Copy the core's cheat switches into the menu's display state."""
-        if self.game is None:
-            return
-        cheats = self.game.cheats
-        self.cheats_activated["INVINCIBILITY"] = cheats.invincible
-        self.cheats_activated["FREEZE GHOSTS"] = cheats.freeze_ghosts
-        self.cheats_activated["2x SPEED"] = cheats.fast_player
+        if not game.cheats.active:
+            return          # cheats disabled in the config
+        name = self.cheat_options[index]
+        self.cheats_activated[name] = not self.cheats_activated[name]
 
     def steer(self, key: str) -> bool:
         """Turn an arrow key into a buffered turn for the player.
@@ -1111,26 +1093,42 @@ class Screen:
             self.game.set_direction(wanted)
         return True
 
-    def cheat_key(self, key: str) -> None:
-        """Apply the reviewer shortcuts: C toggles cheat mode, F1..F7 act."""
+    def cheat_key(self, key: str) -> int | None:
+        """Run the cheat bound to *key*, if its row is armed (ON).
+
+        The scene asks for the row back so the menu highlight can follow
+        a letter pressed from anywhere in the list.
+
+        Args:
+            key: one of ``CHEAT_KEYS``.
+
+        Returns:
+            The row index of *key*, or None when it is not a cheat key
+            or the row is still OFF.
+        """
+        key = key.lower()          # aceita "L" com Shift/CapsLock
+        if key not in CHEAT_KEYS:
+            return None
+        index = CHEAT_KEYS.index(key)
+        name = self.cheat_options[index]
         game = self.game
-        if game is None:
-            return
-        if key == "c":
+        if game is None or not self.cheats_activated[name]:
+            return None
+        if not game.cheats.active:
             game.toggle_cheats()
+        if not game.cheats.active:
+            return None          # cheats disabled in the config
         actions = {
-            "f1": game.toggle_invincible,
-            "f2": game.toggle_freeze_ghosts,
-            "f3": game.toggle_fast_player,
-            "f4": game.add_life,
-            "f5": game.skip_level,
-            "f6": game.frighten_ghosts,
-            "f7": game.add_time,
+            "MORE LIVES": game.add_life,
+            "INVINCIBILITY": game.toggle_invincible,
+            "2x SPEED": game.toggle_fast_player,
+            "FREEZE GHOSTS": game.toggle_freeze_ghosts,
+            "SCARE GHOSTS": game.frighten_ghosts,
+            "SKIP LEVEL": game.skip_level,
+            "+30S": game.add_time,
         }
-        action = actions.get(key)
-        if action is not None:
-            action()
-        self.mirror_cheats()
+        actions[name]()
+        return index
 
     def clear(self, screen: pygame.Surface) -> None:
         """Fill the window with the background colour."""

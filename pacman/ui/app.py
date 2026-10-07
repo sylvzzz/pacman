@@ -29,9 +29,6 @@ SPECIAL_KEYS = {
     pygame.K_RETURN: "enter", pygame.K_KP_ENTER: "enter",
     pygame.K_ESCAPE: "escape", pygame.K_SPACE: "space",
     pygame.K_BACKSPACE: "backspace",
-    pygame.K_F1: "f1", pygame.K_F2: "f2", pygame.K_F3: "f3",
-    pygame.K_F4: "f4", pygame.K_F5: "f5", pygame.K_F6: "f6",
-    pygame.K_F7: "f7",
 }
 
 

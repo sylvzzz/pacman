@@ -1,26 +1,18 @@
-Welcome to Pac-Man
 Made by dbotelho and dbaltaza at 42 Lisbon
-
           MENU
 -----------------------------
 Enter - Select menu option
 Arrow Up/Down - Move between options
 Arrow Left - Go back
-
           GAME
 -----------------------------
 Arrows or WASD - Movement
-4 then 2 - Cheat menu
-C - Cheat mode on/off (reviewers)
-F1 invincible  F2 freeze ghosts  F3 fast
-F4 +1 life  F5 skip level  F6 scare  F7 +30s
+C - Open / close the cheat menu
+L - +1 life    I - invincible    S - 2x speed
+F - freeze ghosts    G - scare gho
+sts
+N - skip level    T - +30 secondsq
 R - Restart run
 ESC - Pause menu (Resume / Main menu)
 Q - Quit
 Enter - Select menu option
-
-   WHEN THE RUN ENDS
------------------------------
-Type your name (10 letters, digits
-or spaces) and press Enter to save
-your score. ESC skips saving.

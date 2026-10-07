@@ -389,7 +389,7 @@ def test_toggle_off_clears_switches(game: Game) -> None:
 
 
 def test_invincible_ignores_ghosts(small_config: GameConfig) -> None:
-    """With F1 a touching ghost costs nothing."""
+    """A touching ghost costs nothing while invincible."""
     g = rig(small_config, ghosts=((9, 1),))
     g.ghosts[0].tile = (1, 1)
     g.toggle_cheats()
@@ -422,7 +422,7 @@ def test_fast_player_is_faster(small_config: GameConfig) -> None:
 
 
 def test_add_life_and_time(game: Game) -> None:
-    """F4 and F7 add a life and seconds."""
+    """The life and time cheats add a life and seconds."""
     game.toggle_cheats()
     game.add_life()
     before = game.time_left
@@ -431,16 +431,33 @@ def test_add_life_and_time(game: Game) -> None:
     assert game.time_left > before
 
 
+def test_add_life_stops_at_ten(game: Game) -> None:
+    """The life cheat cannot go past a ten-life cap."""
+    game.toggle_cheats()
+    for _ in range(20):
+        game.add_life()
+    assert game.lives == 10
+
+
 def test_frighten_cheat(small_config: GameConfig) -> None:
-    """F6 makes every ghost edible."""
+    """The scare cheat makes every ghost edible."""
     game = rig(small_config, ghosts=((9, 1),))
     game.toggle_cheats()
     game.frighten_ghosts()
     assert all(g.is_edible for g in game.ghosts)
 
 
+def test_calm_cheat_ends_the_frighten(small_config: GameConfig) -> None:
+    """The scare can be taken back: ghosts go edible to normal."""
+    game = rig(small_config, ghosts=((9, 1),))
+    game.toggle_cheats()
+    game.frighten_ghosts()
+    game.calm_ghosts()
+    assert not any(g.is_edible for g in game.ghosts)
+
+
 def test_skip_level_wins(game: Game) -> None:
-    """F5 wins the current level at once."""
+    """The skip cheat wins the current level at once."""
     game.toggle_cheats()
     game.skip_level()
     assert phase_of(game) is Phase.LEVEL_WON

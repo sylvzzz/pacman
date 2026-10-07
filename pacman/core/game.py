@@ -66,11 +66,11 @@ class Cheats:
     """The reviewer cheat switches.
 
     Attributes:
-        active: master switch (key C).  While off, the others do
-            nothing and are all reset.
-        invincible: ghosts cannot hurt the player (F1).
-        freeze_ghosts: ghosts stand still (F2).
-        fast_player: the player moves faster (F3).
+        active: master switch, turned on by the first cheat of a run.
+            While off, the others do nothing and are all reset.
+        invincible: ghosts cannot hurt the player.
+        freeze_ghosts: ghosts stand still.
+        fast_player: the player moves faster.
     """
 
     active: bool = False
@@ -125,10 +125,6 @@ class Game:
     def lives(self) -> int:
         """Return the lives the player has left."""
         return self.player.lives
-
-    # ------------------------------------------------------------------
-    # Level setup
-    # ------------------------------------------------------------------
 
     def _seed_for(self, index: int) -> int:
         """Return the maze seed: fixed for level 1, random afterwards."""
@@ -188,10 +184,6 @@ class Game:
         else:
             self.phase = Phase.PLAYING
 
-    # ------------------------------------------------------------------
-    # Commands from the UI
-    # ------------------------------------------------------------------
-
     def start(self) -> None:
         """Start (or restart) a run from level 1 with a fresh score."""
         self.score = 0
@@ -212,10 +204,6 @@ class Game:
             self._paused_from = self.phase
             self.phase = Phase.PAUSED
 
-    # ------------------------------------------------------------------
-    # Cheats
-    # ------------------------------------------------------------------
-
     def toggle_cheats(self) -> None:
         """Turn cheat mode on or off, if the config allows it.
 
@@ -229,43 +217,45 @@ class Game:
             self.cheats.active = True
 
     def toggle_invincible(self) -> None:
-        """F1: flip invincibility."""
+        """Flip invincibility."""
         if self.cheats.active:
             self.cheats.invincible = not self.cheats.invincible
 
     def toggle_freeze_ghosts(self) -> None:
-        """F2: flip ghost freeze."""
+        """Flip ghost freeze."""
         if self.cheats.active:
             self.cheats.freeze_ghosts = not self.cheats.freeze_ghosts
 
     def toggle_fast_player(self) -> None:
-        """F3: flip the speed boost."""
+        """Flip the speed boost."""
         if self.cheats.active:
             self.cheats.fast_player = not self.cheats.fast_player
 
     def add_life(self) -> None:
-        """F4: give the player one more life."""
+        """Give the player one more life, up to the ten-life cap."""
         if self.cheats.active and self.phase is not Phase.GAME_OVER:
-            self.player.lives += 1
+            self.player.lives = min(10, self.player.lives + 1)
 
     def skip_level(self) -> None:
-        """F5: win the current level immediately."""
+        """Win the current level immediately."""
         if self.cheats.active and self.phase is Phase.PLAYING:
             self._win_level()
 
     def frighten_ghosts(self) -> None:
-        """F6: make every ghost edible, as a super-pacgum would."""
+        """Make every ghost edible, as a super-pacgum would."""
         if self.cheats.active and self.phase is Phase.PLAYING:
             self._frighten_all()
 
+    def calm_ghosts(self) -> None:
+        """Undo ``frighten_ghosts``: every ghost stops being edible."""
+        if self.cheats.active:
+            for ghost in self.ghosts:
+                ghost.calm()
+
     def add_time(self) -> None:
-        """F7: add ``CHEAT_TIME_BONUS`` seconds to the level timer."""
+        """Add ``CHEAT_TIME_BONUS`` seconds to the level timer."""
         if self.cheats.active and self.phase is Phase.PLAYING:
             self.time_left += CHEAT_TIME_BONUS
-
-    # ------------------------------------------------------------------
-    # Simulation
-    # ------------------------------------------------------------------
 
     def update(self, dt: float) -> None:
         """Advance the game by *dt* seconds.

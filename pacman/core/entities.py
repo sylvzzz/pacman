@@ -323,6 +323,12 @@ class Ghost(Mover):
         self.state = GhostState.FRIGHTENED
         self.frightened_timer = duration
 
+    def calm(self) -> None:
+        """Take the fright back: FRIGHTENED becomes NORMAL at once."""
+        if self.state is GhostState.FRIGHTENED:
+            self.state = GhostState.NORMAL
+            self.frightened_timer = 0.0
+
     def eat(self, respawn_time: float) -> None:
         """Turn the ghost into eyes that walk home as EATEN.
 

@@ -43,25 +43,28 @@ The program takes exactly one argument, the path to a configuration file.
 | Enter | menus | choose |
 | Arrows | game | steer; a turn pressed early is kept until the junction, and the opposite key reverses at once |
 | Esc | game | pause menu (Resume / Main Menu) |
+| C | game | open / close the cheat menu |
 | R | game | restart the run from level 1 |
 | Q | menus, game | quit (a run in progress is saved first) |
 | Space / Enter | end screen | back to the menu |
 
 **Cheat mode** (for reviewers; needs `cheats_enabled` in the config). Press
-`C` to turn it on; the keys below do nothing until then, and turning it off
-clears them all. The same toggles are in the cheat menu, opened by pressing
-`4` then `2` while playing.
+`C` while playing to open the cheat menu. Enter arms the row the highlight
+is on (its label turns `ON`); the first arm of a run turns cheat mode on,
+and a config with `cheats_enabled` false keeps every one of them dead. A
+cheat runs from its own key below while its row is `ON`, and `C` or `ESC`
+closes the menu. Disarming the `SCARE GHOSTS` row does not end the scare;
+only the cheat itself (G) has an effect.
 
 | Key | Effect |
 | --- | --- |
-| C | cheat mode on / off |
-| F1 | invincible: ghosts cannot hurt you |
-| F2 | freeze the ghosts |
-| F3 | faster player (1.8x) |
-| F4 | one extra life |
-| F5 | skip to the next level |
-| F6 | frighten every ghost, as a super-pacgum does |
-| F7 | add 30 seconds to the level timer |
+| L | one extra life |
+| I | invincible: ghosts cannot hurt you |
+| S | faster player (1.8x) |
+| F | freeze the ghosts |
+| G | frighten every ghost, as a super-pacgum does |
+| N | skip to the next level |
+| T | add 30 seconds to the level timer |
 
 The same table is on the in-game Instructions screen.
 

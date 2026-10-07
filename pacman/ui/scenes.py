@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from pacman.core.game import Phase
 from pacman.ui.highscores import MAX_NAME_LENGTH, is_valid_name
+from pacman.ui.renderer import CHEAT_MENU_KEY
 
 if TYPE_CHECKING:
     from pacman.ui.app import App
@@ -120,7 +121,6 @@ class PlayScene(Scene):
         self.cheat_menu = False
         self.pause_index = 0
         self.cheat_index = 0
-        self.seq_started = False
         entries = app.table.entries
         app.view.high_score = entries[0].score if entries else 0
         app.view.start_game()
@@ -146,18 +146,13 @@ class PlayScene(Scene):
             self.app.running = False
         elif key == "r":
             view.restart_game()
-        elif view.steer(key):
-            pass
-        else:
-            self._cheat_sequence(key)
-            view.cheat_key(key)
-
-    def _cheat_sequence(self, key: str) -> None:
-        """Open the cheat menu on the secret "4" then "2" sequence."""
-        if self.seq_started and key == "2":
+        elif key == CHEAT_MENU_KEY:
             self.cheat_menu = True
             self.cheat_index = 0
-        self.seq_started = key == "4"
+        elif view.cheat_key(key) is not None:
+            pass                        # an armed cheat key fired
+        elif view.steer(key):
+            pass
 
     def _pause_key(self, key: str) -> None:
         """Keys in the pause menu: Resume / Main Menu."""
@@ -172,17 +167,25 @@ class PlayScene(Scene):
                 self.app.set_scene(MenuScene(self.app))
 
     def _cheat_menu_key(self, key: str) -> None:
-        """Keys in the cheat menu: move, toggle, leave."""
-        count = len(self.app.view.cheat_options)
-        if key == "up":
-            self.cheat_index = (self.cheat_index - 1) % count
-        elif key == "down":
-            self.cheat_index = (self.cheat_index + 1) % count
-        elif key in ("escape", "q"):
+        """Keys in the cheat menu: move the highlight, run, or leave.
+
+        The arrows move the highlight; enter runs the row it is on, and
+        a cheat's own key runs it from anywhere in the list.
+        """
+        view = self.app.view
+        key = key.lower()
+        count = len(view.cheat_options)
+        if key in (CHEAT_MENU_KEY, "escape", "q"):
             self.cheat_menu = False
+        elif key in ("up", "down"):
+            step = 1 if key == "down" else -1
+            self.cheat_index = (self.cheat_index + step) % count
         elif key == "enter":
-            if self.app.view.toggle_cheat(self.cheat_index):
-                self.cheat_menu = False
+            view.toggle_cheat(self.cheat_index)
+        else:
+            row = view.cheat_key(key)
+            if row is not None:
+                self.cheat_index = row
 
     def update(self, dt: float) -> None:
         """Step the game unless a menu is open; move on when it ends."""

@@ -96,15 +96,105 @@ def test_paused_game_does_not_advance(app: App) -> None:
     assert game.time_left == before
 
 
-def test_secret_sequence_opens_the_cheat_menu(app: App) -> None:
-    """4 then 2 opens it; any other key between them does not."""
+def test_c_opens_the_cheat_menu(app: App) -> None:
+    """C opens it and closes it again; the old 4-2 sequence does not."""
     play = start_run(app)
-    press(app, "4", "x", "2")
-    assert not play.cheat_menu
     press(app, "4", "2")
-    assert play.cheat_menu
-    press(app, "escape")
     assert not play.cheat_menu
+    press(app, "c")
+    assert play.cheat_menu
+    press(app, "c")
+    assert not play.cheat_menu
+    press(app, "c", "escape")
+    assert not play.cheat_menu
+
+
+def test_cheat_menu_letter_runs_its_cheat(app: App) -> None:
+    """I needs its row armed by enter; then it turns on invincibility."""
+    play = start_run(app)
+    game = app.view.game
+    assert game is not None
+    press(app, "c", "i")                    # not armed: the key is dead
+    assert play.cheat_menu
+    assert not game.cheats.active and not game.cheats.invincible
+    press(app, "down", "enter", "i")        # arm INVINCIBILITY, then I
+    assert game.cheats.active and game.cheats.invincible
+    assert app.view.cheats_activated["INVINCIBILITY"]
+    assert play.cheat_index == 1
+
+
+def test_enter_arms_the_row_but_does_not_run_it(app: App) -> None:
+    """Enter only unlocks the row's key; the letter itself runs it."""
+    play = start_run(app)
+    game = app.view.game
+    assert game is not None
+    press(app, "c", "enter")                # MORE LIVES, first row
+    assert game.lives == 3                  # arming adds no life
+    assert app.view.cheats_activated["MORE LIVES"]
+    press(app, "l")                         # armed: L runs the cheat
+    assert game.lives == 4
+    press(app, "l")                         # and keeps running it
+    assert game.lives == 5
+    press(app, "enter")                     # disarm again: L goes dead
+    assert not app.view.cheats_activated["MORE LIVES"]
+    press(app, "l")
+    assert game.lives == 5
+    assert play.cheat_index == 0
+
+
+def test_cheat_menu_letters_are_case_insensitive(app: App) -> None:
+    """Caps lock must not make the shortcuts go dead."""
+    play = start_run(app)
+    game = app.view.game
+    assert game is not None
+    press(app, "C", "down", "down", "enter", "S")  # arm 2x SPEED, then S
+    assert play.cheat_menu and game.cheats.fast_player
+
+
+def test_one_shot_cheats_mark_their_row_used(app: App) -> None:
+    """The cheats with no switch in the core light up once they run."""
+    start_run(app)
+    game = app.view.game
+    assert game is not None
+    press(app, "c", "l")                    # not armed: nothing runs
+    assert game.lives == 3
+    assert not app.view.cheats_activated["MORE LIVES"]
+    press(app, "enter", "l")                # arm, then run
+    assert game.lives == 4
+    assert app.view.cheats_activated["MORE LIVES"]
+    assert not app.view.cheats_activated["INVINCIBILITY"]
+
+
+def test_one_shot_cheats_can_be_turned_off_again(app: App) -> None:
+    """Disarming clears the row; the extra life is not taken back."""
+    start_run(app)
+    game = app.view.game
+    assert game is not None
+    press(app, "c", "enter", "l")           # arm, then take the life
+    assert game.lives == 4
+    assert app.view.cheats_activated["MORE LIVES"]
+    press(app, "enter")                     # disarm
+    assert game.lives == 4
+    assert not app.view.cheats_activated["MORE LIVES"]
+    press(app, "l")                         # disarmed: L no longer runs
+    assert game.lives == 4
+
+
+def test_armed_l_adds_lives_during_play(app: App) -> None:
+    """Toggle ON unlocks L for the rest of the run, menu open or not."""
+    play = start_run(app)
+    game = app.view.game
+    assert game is not None
+    press(app, "c", "enter")                # arm MORE LIVES
+    press(app, "c")                         # close the menu, keep playing
+    assert not play.cheat_menu
+    press(app, "l")
+    assert game.lives == 4
+    press(app, "l")                         # stays armed: keeps stacking
+    assert game.lives == 5
+    press(app, "c", "enter", "c")           # disarm and play on
+    press(app, "l")
+    assert game.lives == 5
 
 
 def finish_run(app: App, score: int, phase: Phase) -> EndScene:
