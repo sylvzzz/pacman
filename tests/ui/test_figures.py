@@ -56,8 +56,8 @@ def extent(surface: pygame.Surface) -> tuple[int, int]:
 def test_sprites_fit_their_box(surface: pygame.Surface, radius: int) -> None:
     """Sprites are sized by the corridor, so they must not outgrow it.
 
-    ``disc`` stamps a rim one pixel outside the circle and the ghost's
-    skirt hangs one pixel below it; three pixels of slack covers both.
+    ``disc`` stamps a rim one pixel outside the circle, and the ghost's
+    bitmap scales to ``2r + 1``; three pixels of slack covers both.
     """
     sprites: tuple[typing.Callable[[], None], ...] = (
         lambda: disc(surface, CX, CY, radius, (255, 0, 0)),
@@ -111,6 +111,18 @@ def test_ghost_fits_its_box(surface: pygame.Surface) -> None:
     """A ghost must not spill into the wall beside its corridor."""
     ghost(surface, CX, CY, 14, (255, 64, 64))
     assert all(dim <= 2 * 14 + 3 for dim in extent(surface))
+
+
+def test_ghost_bitmap_rows_are_all_the_same_width() -> None:
+    """A ragged row shifts that row off-centre, silently.
+
+    The dome and hem are strings, so a miscounted row still draws --
+    it just draws wrong.  One set, one width, or the sprite is broken.
+    """
+    from pacman.ui.figures import _BODY_ROWS, _GRID, _HEM_FRAMES
+
+    rows = _BODY_ROWS + tuple(r for frame in _HEM_FRAMES for r in frame)
+    assert {len(row) for row in rows} == {_GRID}
 
 
 def test_ghost_skirt_is_wavy(surface: pygame.Surface) -> None:

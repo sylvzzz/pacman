@@ -42,8 +42,17 @@ FACE_RED = (255, 0, 0)
 
 Color = tuple[int, int, int]
 
-# Ghost colours in the core's order: Blinky, Pinky, Inky, Clyde.
-GHOST_COLORS = ("red", "magenta", "orange", "cyan")
+# Ghost names in the core's order: Blinky, Pinky, Inky, Clyde.
+GHOST_COLORS = ("blinky", "pinky", "inky", "clyde")
+
+# Flat body colours of the four ghosts.  Kept apart from ``Screen.colors``
+# so the winner screen's rainbow and the HUD reds are not affected.
+GHOST_RGB = {
+    "blinky": (255, 0, 0),
+    "pinky": (255, 105, 180),
+    "inky": (0, 255, 255),
+    "clyde": (255, 128, 0),
+}
 
 KEY_TO_DIRECTION = {
     "up": Direction.UP,
@@ -117,8 +126,6 @@ class Screen:
         self.CHOMP_PERIOD = 0.19
         self.GHOST_PERIOD = 0.42
         self.FRIGHT_FLASH = 0.26
-        # Power pellets blink like the arcade's, on and off.
-        self.POWER_BLINK = 0.22
         # Seconds of flashing before a frightened ghost turns back.
         self.FRIGHT_WARNING = 2.0
         # How long the player's death animation plays, in seconds.
@@ -371,7 +378,10 @@ class Screen:
                 ghosts.append((
                     rng.randint(xs[0], max(xs[0], xs[1])),
                     rng.randint(ys[0], max(ys[0], ys[1])),
-                    rng.choice(((1, 0), (-1, 0), (0, 1), (0, -1))),
+                    # Pupils dead-centre: the menu ghosts pose for the
+                    # player the way the arcade title art does, not look
+                    # off in four different directions.
+                    (0, 0),
                     color))
 
             span = self.width - 2 * pad
@@ -402,8 +412,10 @@ class Screen:
         radius = self.hud_scale() * 4
         body = self.colors["pellet"]
         halo = shade(body, 0.5)
+        unit = max(1, (2 * radius) // 14)
         for x, y, facing, color in ghosts:
-            ghost(screen, x, y, radius, self.colors[color], facing)
+            ghost(screen, x, y, radius, GHOST_RGB[color], facing,
+                  pixel=unit)
         power = self.hud_scale()
         for x, y, size in pellets:
             if size == power:
@@ -586,6 +598,20 @@ class Screen:
         corridor = self.cell_size - 2 * self.band_size[0]
         return max(10, round(corridor * 0.74))
 
+    def sprite_unit(self) -> int:
+        """Side in pixels of one cell of the 14x14 ghost bitmap.
+
+        A whole number, so every cell of the sprite is the same size and
+        the ghost stays on a rigid pixel grid.  Never so large that the
+        14-cell sprite would be wider than the corridor.
+        """
+        corridor = self.cell_size - 2 * self.band_size[0]
+        return max(1, min(round(self.entity_size() / 14), corridor // 14))
+
+    def sprite_diameter(self) -> int:
+        """Pixel side of the ghost, and the diameter of the player."""
+        return 14 * self.sprite_unit()
+
     def halo_pad(self) -> int:
         """How far a wall's glow spreads, in pixels."""
         return max(1, round(self.cell_size * 0.055))
@@ -632,7 +658,7 @@ class Screen:
         """
         scale = max(2, self.hud_scale() // 2)
         while scale > 1:
-            need = (self.text_width("1UP", scale, scale)
+            need = (self.text_width("SCORE", scale, scale)
                     + self.text_width("HIGH SCORE", scale, scale)
                     + self.text_width("TIME", scale, scale) + scale * 8)
             if need <= self.width - 2 * MARGIN:
@@ -777,8 +803,7 @@ class Screen:
         for tx, ty in sorted(field.pacgums):
             cx, cy = self.centre_of(tx, ty)
             self.stamp_pellet(screen, cx, cy, small_r, body)
-        blink = int(self.anim / self.POWER_BLINK) % 2 == 0
-        for tx, ty in sorted(field.super_pacgums if blink else ()):
+        for tx, ty in sorted(field.super_pacgums):
             cx, cy = self.centre_of(tx, ty)
             self.stamp_pellet(screen, cx, cy, big_r + 1.5, halo)
             self.stamp_pellet(screen, cx, cy, big_r, body)
@@ -829,7 +854,7 @@ class Screen:
         if self.death_left > 0:
             progress = 1.0 - self.death_left / self.DEATH_TIME
             pacman(screen, *self.centre_of(*self.death_pos),
-                   self.entity_size() / 2, self.colors["yellow"],
+                   self.sprite_diameter() / 2, self.colors["yellow"],
                    (0.0, -1.0), min(1.95, 1.0 + progress))
             return
         moving = player.direction is not None
@@ -839,7 +864,7 @@ class Screen:
         else:
             mouth = 0.0
         pacman(screen, *self.centre_of(player.x, player.y),
-               self.entity_size() / 2, self.colors["yellow"],
+               self.sprite_diameter() / 2, self.colors["yellow"],
                facing_of(player), mouth)
 
     def draw_ghosts_from_core(self, screen: pygame.Surface) -> None:
@@ -848,7 +873,8 @@ class Screen:
         A hunting ghost is its own colour with white eyes looking along its
         heading.  An edible ghost flashes between a blue body with a peach
         face and a white body with a red face, the universal "eat me now"
-        signal.  An eaten ghost is just a pair of eyes heading home.  Every
+        signal.  An eaten ghost is not drawn at all: it disappears and
+        reappears when it respawns.  Every
         ghost's skirt waves on the same slow beat so the board feels alive
         without the sprites drawing attention away from the corridors.
         """
@@ -856,23 +882,22 @@ class Screen:
             return
         phase = int(self.anim / self.GHOST_PERIOD) % 2
         flash = int(self.anim / self.FRIGHT_FLASH) % 2 == 0
-        radius = self.entity_size() / 2
+        unit = self.sprite_unit()
+        radius = self.sprite_diameter() / 2
         for spirit, color_name in zip(self.game.ghosts, GHOST_COLORS):
+            if spirit.state is GhostState.EATEN:
+                continue            # eaten: gone until it respawns
             cx, cy = self.centre_of(spirit.x, spirit.y)
-            if spirit.state == GhostState.EATEN:
-                ghost(screen, cx, cy, radius, (0, 0, 0),
-                      facing_of(spirit), eyes_only=True)
-                continue
             if spirit.is_edible:
                 warn = spirit.frightened_timer < self.FRIGHT_WARNING
                 lit = flash or not warn
                 color = FRIGHT_BLUE if lit else self.colors["white"]
                 face = FACE_PEACH if lit else FACE_RED
                 ghost(screen, cx, cy, radius, color, facing_of(spirit),
-                      phase, scared=True, face=face)
+                      phase, scared=True, face=face, pixel=unit)
             else:
-                ghost(screen, cx, cy, radius, self.colors[color_name],
-                      facing_of(spirit), phase)
+                ghost(screen, cx, cy, radius, GHOST_RGB[color_name],
+                      facing_of(spirit), phase, pixel=unit)
 
     def draw_popups(self, screen: pygame.Surface) -> None:
         """Draw and retire the floating score rewards."""
@@ -896,10 +921,10 @@ class Screen:
     def draw_hud(self, screen: pygame.Surface) -> None:
         """Draw the arcade-style header and footer, small and quiet.
 
-        Header: ``1UP`` over the score on the left, ``HIGH SCORE`` in the
+        Header: ``SCORE`` over the score on the left, ``HIGH SCORE`` in the
         middle, ``TIME`` on the right, each label over its number the way
         the arcade stacks them.  Footer: one little Pac-Man per life on
-        the left, the level on the right.  The ``1UP`` blinks, as it does
+        the left, the level on the right.  The ``SCORE`` blinks, as it does
         in the arcade, and the clock turns red for the last ten seconds.
         """
         if self.game is None:
@@ -923,7 +948,7 @@ class Screen:
                            y, scale, color, track)
 
         blink = int(self.anim * 2) % 2 == 0
-        field("1UP" if blink else "   ", f"{self.points:05d}", pad, value)
+        field("SCORE" if blink else "   ", f"{self.points:05d}", pad, value)
         best = max(self.high_score, self.points)
         centre = self.text_width("HIGH SCORE", scale, track)
         field("HIGH SCORE", f"{best:05d}", (self.width - centre) // 2, value)

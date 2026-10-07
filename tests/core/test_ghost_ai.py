@@ -83,11 +83,20 @@ def test_shy_retreats_when_close_and_chases_when_far() -> None:
 
 
 def test_eaten_ghost_stays() -> None:
-    """An eaten ghost has no direction."""
+    """An eaten ghost already on home waits there for its revival."""
     ghost = ghost_at((4, 1), state=GhostState.EATEN)
     player = Player((1, 1), 5.0, 3)
     assert choose_ghost_direction(ghost, HALL, player,
                                   random.Random(0)) is None
+
+
+def test_eaten_ghost_walks_home() -> None:
+    """Away from home the eyes head back, ignoring the player."""
+    ghost = ghost_at((4, 1), state=GhostState.EATEN)
+    ghost.home = (1, 1)
+    player = Player((7, 1), 5.0, 3)
+    assert choose_ghost_direction(ghost, HALL, player,
+                                  random.Random(0)) is Direction.LEFT
 
 
 def test_walled_in_ghost_stays() -> None:

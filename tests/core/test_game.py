@@ -228,6 +228,54 @@ def test_eaten_ghost_is_harmless(small_config: GameConfig) -> None:
     assert g.lives == 3
 
 
+def test_eaten_ghost_revives_after_the_respawn_delay(
+        small_config: GameConfig) -> None:
+    """An eaten ghost walks off its death spot and comes back NORMAL."""
+    g = rig(small_config, ghosts=((9, 1),))
+    g.ghosts[0].frighten(4.0)
+    g.ghosts[0].tile = (1, 1)
+    g.update(0.016)
+    assert g.ghosts[0].state is GhostState.EATEN
+    assert g.ghosts[0].tile != (9, 1)      # no teleport to the spawn
+    run(g, small_config.ghost_respawn_time + 0.5)
+    assert g.ghosts[0].state is GhostState.NORMAL
+    assert g.ghosts[0].is_active
+
+
+def test_eaten_ghost_walks_home_and_revives_there(
+        small_config: GameConfig) -> None:
+    """The eyes travel the maze and revive standing on the home tile."""
+    cfg = GameConfig(**{**small_config.__dict__,
+                        "ghost_respawn_time": 60.0})
+    g = rig(cfg, ghosts=((9, 1),))
+    g.ghosts[0].frighten(4.0)
+    g.ghosts[0].tile = (1, 1)
+    g.update(0.016)
+    assert g.ghosts[0].state is GhostState.EATEN
+    steps = 0
+    while g.ghosts[0].state is GhostState.EATEN and steps < 400:
+        g.update(0.016)
+        steps += 1
+    assert g.ghosts[0].state is GhostState.NORMAL
+    assert g.ghosts[0].tile == (9, 1)
+
+
+def test_eaten_ghost_revives_when_the_fright_window_ends(
+        small_config: GameConfig) -> None:
+    """The fright window closing mid-EATEN neither revives nor sticks."""
+    g = rig(small_config, ghosts=((9, 1),))
+    g.ghosts[0].frighten(0.5)
+    g.ghosts[0].tile = (1, 1)
+    g.update(0.016)
+    assert g.ghosts[0].state is GhostState.EATEN
+    run(g, 1.0)                        # the fright window has ended
+    assert g.ghosts[0].state is GhostState.EATEN
+    assert g.ghosts[0].tile != (1, 1)   # still walking home, not stuck
+    run(g, small_config.ghost_respawn_time)
+    assert g.ghosts[0].state is GhostState.NORMAL
+    assert g.ghosts[0].tile != (9, 1)
+
+
 def test_game_over_at_zero_lives(small_config: GameConfig) -> None:
     """Losing the last life ends the game with lives at 0."""
     g = rig(small_config, ghosts=((9, 1),))

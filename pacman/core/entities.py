@@ -261,16 +261,17 @@ class Ghost(Mover):
     """A ghost with a home corner, a personality and a state machine.
 
     The states: NORMAL -> FRIGHTENED (super-pacgum) -> NORMAL (timer
-    ends); FRIGHTENED -> EATEN (player touches it) -> NORMAL (respawn
-    timer ends).  EATEN cannot be frightened again: a ghost already
-    heading home is not edible twice.
+    ends); FRIGHTENED -> EATEN (player touches it) -> NORMAL (the eyes
+    reach home, or the respawn timer ends).  EATEN cannot be frightened
+    again: a ghost already heading home is not edible twice.
 
     Attributes:
         home: the corner tile it starts on and returns to when eaten.
         personality: which chase rule ``ghost_ai`` uses.
         state: current ``GhostState``.
         frightened_timer: seconds of edibility left.
-        respawn_timer: seconds until an eaten ghost returns.
+        respawn_timer: seconds until an eaten ghost returns on its own,
+            the fallback for a trip that never reaches ``home``.
         release_timer: seconds it still waits on its home tile before
             leaving; ``game`` staggers these so the pack does not leave
             in one block.
@@ -286,6 +287,7 @@ class Ghost(Mover):
         self.frightened_timer = 0.0
         self.respawn_timer = 0.0
         self.release_timer = 0.0
+        self._travelling_home = False
 
     @property
     def is_edible(self) -> bool:
@@ -322,13 +324,17 @@ class Ghost(Mover):
         self.frightened_timer = duration
 
     def eat(self, respawn_time: float) -> None:
-        """Send the ghost home as EATEN until *respawn_time* passes.
+        """Turn the ghost into eyes that walk home as EATEN.
 
-        It teleports to its home tile; the frightened timer is
-        forgotten, so it returns NORMAL, not frightened again.
+        The ghost stays where it was eaten: ``ghost_ai`` steers the eyes
+        back to ``home`` and the ghost revives standing on it.  Eaten
+        *on* home there is no trip to make, so it waits for
+        ``respawn_time`` instead -- an instant revival would put a live
+        ghost under the player's feet.
         """
-        self.reset(self.home)
+        self._travelling_home = self.tile != self.home
         self.state = GhostState.EATEN
+        self.frightened_timer = 0.0
         self.respawn_timer = respawn_time
 
     def tick(self, dt: float) -> None:
@@ -337,7 +343,8 @@ class Ghost(Mover):
         A ghost still waiting to be released counts ``release_timer``
         down as well.  FRIGHTENED counts ``frightened_timer`` and
         returns to NORMAL;
-        EATEN counts ``respawn_timer`` and returns to NORMAL; NORMAL
+        EATEN returns to NORMAL on reaching ``home``, or when
+        ``respawn_timer`` runs out; NORMAL
         does nothing.  Clamp the finished timer to 0.0.
         """
         self.release_timer = max(0.0, self.release_timer - dt)
@@ -348,6 +355,8 @@ class Ghost(Mover):
                 self.state = GhostState.NORMAL
         elif self.state is GhostState.EATEN:
             self.respawn_timer -= dt
-            if self.respawn_timer <= 0:
+            arrived = (self._travelling_home and self.tile == self.home
+                       and self.target is None)
+            if self.respawn_timer <= 0 or arrived:
                 self.respawn_timer = 0.0
                 self.state = GhostState.NORMAL

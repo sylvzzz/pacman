@@ -90,11 +90,17 @@ def choose_ghost_direction(ghost: Ghost, level: Level, player: Player,
 
     Returns:
         A direction into an open tile, or None when the ghost stays
-        (EATEN, or walled in).
+        (an eaten ghost already on home, or walled in).
     """
+    options = _open_directions(ghost, level)
     if ghost.state is GhostState.EATEN:
-        return None
-    options = _without_reversal(ghost, _open_directions(ghost, level))
+        if not options or ghost.tile == ghost.home:
+            return None
+        # The eyes walk home: straight down the BFS gradient, and free
+        # to reverse because the shortest way back can double back.
+        distances = level.distances_from(ghost.home)
+        return _best_by_distance(ghost, options, distances, rng, True)
+    options = _without_reversal(ghost, options)
     if not options:
         return None
     if ghost.state is GhostState.FRIGHTENED:

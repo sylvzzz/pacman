@@ -111,11 +111,63 @@ def pacman(screen: pygame.Surface, cx: int, cy: int, radius: float,
 
 # --- The ghost ------------------------------------------------------------
 #
-# A round head on a straight body whose hem is cut into three triangular
-# notches.  The notches shift half a step between the two animation
-# frames, which is what makes the skirt wave.
+# The arcade sprite, kept as a bitmap: a fixed 14x14 grid of square pixels
+# (stepped dome head, straight sides, three jagged feet).  Every grid cell
+# is stamped as one solid block, so the sprite keeps its hard 8-bit edges:
+# no outline, no highlight, no shading, flat colour only.
 _PUPIL = (30, 30, 120)
 _WHITE = (255, 255, 255)
+
+#: Width and height of the sprite's grid, in cells.
+_GRID = 14
+
+# Head and body, rows 0..11: flat in the centre of the top, stepping out
+# in blocky pixels to the full width, then straight down.
+_BODY_ROWS = (
+    "....######....",
+    "..##########..",
+    ".############.",
+    ".############.",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+)
+
+# The hem, rows 12..13: always exactly three feet and two notches.  A notch
+# is one cell wide on its upper row and three on its lower one, so the
+# feet are chunky blocks that taper a little towards the floor.  The second
+# frame moves the notches one step, which is the arcade's walking wobble.
+_HEM_FRAMES = (
+    ("####.####.####",
+     "###...##...###"),
+    ("###.####.#####",
+     "##...####...##"),
+)
+
+# The hunting eye: a white block 4 cells wide and 5 tall, with a 2x2
+# dark-blue pupil that slides one step inside it towards the heading.
+_EYE_SHAPE = (
+    "####",
+    "####",
+    "####",
+    "####",
+    "####",
+)
+_EYE_COLS = (2, 8)   # left column of each eye (symmetrical on 14 cells)
+_EYE_TOP = 3         # top row of the eyes, in the upper half of the face
+
+# The frightened face: two 2x2 square eyes over a zigzag mouth, stamped
+# in the caller's face colour the way the arcade draws it on the blue body.
+_FRIGHT_EYES = tuple((gy, gx) for gy in (5, 6) for gx in (3, 4, 9, 10))
+_FRIGHT_MOUTH = (
+    tuple((9, gx) for gx in (2, 3, 6, 7, 10, 11))
+    + tuple((10, gx) for gx in (1, 4, 5, 8, 9, 12))
+)
 
 
 def _sign(value: float) -> int:
@@ -123,87 +175,97 @@ def _sign(value: float) -> int:
     return (value > 0.3) - (value < -0.3)
 
 
-def _skirt_row(screen: pygame.Surface, left: int, right: int, y: int,
-               notches: list[tuple[int, int]], color: Color) -> None:
-    """Fill one body row from *left* to *right* minus the *notches*.
+def _edges(side: int, cells: int) -> list[int]:
+    """Pixel boundary of each of *cells* divisions across *side* pixels.
 
-    Each notch is a ``(start, end)`` pixel interval left empty.
+    Nearest-neighbour scaling, used only when the caller does not pick a
+    whole-pixel cell size: integer cell edges over the whole sprite, so a
+    cramped corridor still gets a full-size blocky ghost.
     """
-    x = left
-    for start, end in sorted(notches):
-        start, end = max(start, left), min(end, right)
-        if end <= start:
-            continue
-        if start > x:
-            screen.fill(color, (x, y, start - x, 1))
-        x = max(x, end)
-    if right > x:
-        screen.fill(color, (x, y, right - x, 1))
+    return [round(i * side / cells) for i in range(cells + 1)]
+
+
+def _stamp_rows(screen: pygame.Surface, rows: tuple[str, ...],
+                left: int, top: int, cut: list[int],
+                color: Color) -> None:
+    """Stamp every run of ``#`` in *rows* as one rectangle per run."""
+    for gy, row in enumerate(rows):
+        gx = 0
+        while gx < len(row):
+            if row[gx] != "#":
+                gx += 1
+                continue
+            end = gx
+            while end < len(row) and row[end] == "#":
+                end += 1
+            screen.fill(color, (left + cut[gx], top + cut[gy],
+                                cut[end] - cut[gx],
+                                cut[gy + 1] - cut[gy]))
+            gx = end
+
+
+def _stamp_cells(screen: pygame.Surface,
+                 cells: tuple[tuple[int, int], ...],
+                 left: int, top: int, cut: list[int],
+                 color: Color) -> None:
+    """Stamp each ``(row, column)`` cell as one solid block."""
+    for gy, gx in cells:
+        screen.fill(color, (left + cut[gx], top + cut[gy],
+                            cut[gx + 1] - cut[gx],
+                            cut[gy + 1] - cut[gy]))
 
 
 def ghost(screen: pygame.Surface, cx: int, cy: int, radius: float,
           color: Color, facing: Vec = (0, -1), phase: int = 0,
           scared: bool = False, face: Color = (255, 255, 255),
           pixel: int = 0, eyes_only: bool = False) -> None:
-    """Stamp the ghost, centred on ``(cx, cy)``, inside a ``2r`` square.
+    """Stamp the ghost, centred on ``(cx, cy)``.
 
     Args:
         cx, cy: centre in pixels.
-        radius: half the sprite's side in pixels.
+        radius: half the sprite's side in pixels.  Ignored when *pixel*
+            is given.
         color: body colour.
-        facing: heading; the pupils lean that way.
-        phase: 0/1, which way the skirt waves this frame.
+        facing: heading; the pupils lean that way.  ``(0, 0)`` leaves
+            them dead centre, looking straight out.
+        phase: 0/1, which frame of the hem to draw this frame.
         scared: draw the frightened face instead of the hunting eyes.
         face: colour of the frightened eyes and mouth.
-        pixel: ignored; kept so older call sites keep working.
+        pixel: side in screen pixels of one sprite cell.  When positive
+            the sprite is exactly ``14 * pixel`` pixels wide and every
+            cell is the same size, which is the faithful arcade look.
+            When 0 the cells are scaled to fit *radius* instead.
         eyes_only: draw just the eyes, which is what an eaten ghost looks
             like on its way home.
     """
-    r = max(2, int(round(radius)))
-    left, right = cx - r, cx + r
+    rows = _BODY_ROWS + _HEM_FRAMES[int(phase) % 2]
+    if pixel > 0:
+        side = _GRID * pixel
+        cut = [i * pixel for i in range(_GRID + 1)]
+        left, top = cx - side // 2, cy - side // 2
+    else:
+        r = max(2, int(round(radius)))
+        side = 2 * r + 1
+        cut = _edges(side, _GRID)
+        left, top = cx - side // 2, cy - side // 2
     if not eyes_only:
-        # Head: the upper half disc.
-        for dy in range(-r, 1):
-            span = int(round(math.sqrt(max(0.0, r * r - dy * dy))))
-            screen.fill(color, (cx - span, cy + dy, 2 * span + 1, 1))
-        # Body with a notched hem.
-        wave = max(2, r // 3)
-        step = (2.0 * r) / 3.0
-        if int(phase) % 2 == 0:
-            centres = [left + (k + 0.5) * step for k in range(3)]
-        else:
-            centres = [left + k * step for k in range(4)]
-        for row in range(1, r + 1):
-            y = cy + row
-            depth = row - (r - wave)
-            notches = []
-            if depth > 0:
-                half = depth / wave * step / 2.0
-                notches = [(int(round(c - half)), int(round(c + half)))
-                           for c in centres]
-            _skirt_row(screen, left, right + 1, y, notches, color)
-
+        _stamp_rows(screen, rows, left, top, cut, color)
     if scared and not eyes_only:
-        eye = max(1, r // 5)
-        for side in (-1, 1):
-            screen.fill(face, (cx + side * r * 2 // 5 - eye // 2,
-                               cy - r // 3, eye + 1, eye + 1))
-        zig = max(1, r // 6)
-        for i in range(-3, 4):
-            screen.fill(face, (cx + i * zig - zig // 2,
-                               cy + r // 5 + (zig if i % 2 else 0),
-                               zig, zig))
+        _stamp_cells(screen, _FRIGHT_EYES + _FRIGHT_MOUTH,
+                     left, top, cut, face)
         return
-
-    eye_r = max(2, int(r * 0.28))
-    pupil = max(1, int(r * 0.14))
     dx, dy = _sign(facing[0]), _sign(facing[1])
-    for side in (-1, 1):
-        ex = cx + int(round(side * r * 0.38))
-        ey = cy - int(round(r * 0.25))
-        disc(screen, ex, ey, eye_r, _WHITE, rim=False)
-        disc(screen, ex + dx * pupil, ey + dy * pupil, pupil, _PUPIL,
-             rim=False)
+    whites = tuple((_EYE_TOP + gy, base + gx)
+                   for base in _EYE_COLS
+                   for gy, line in enumerate(_EYE_SHAPE)
+                   for gx, ch in enumerate(line) if ch == "#")
+    # 2x2 pupil: centred in the eye at (row 2, column 1) and sliding one
+    # step towards the heading.
+    pupils = tuple((_EYE_TOP + 2 + dy + r_, base + 1 + dx + c_)
+                   for base in _EYE_COLS
+                   for r_ in (0, 1) for c_ in (0, 1))
+    _stamp_cells(screen, whites, left, top, cut, _WHITE)
+    _stamp_cells(screen, pupils, left, top, cut, _PUPIL)
 
 
 def facing_of(entity: Mover) -> Vec:

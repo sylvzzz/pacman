@@ -319,17 +319,29 @@ def test_ghost_frighten_again_restarts_the_timer() -> None:
     assert g.state is GhostState.NORMAL
 
 
-def test_ghost_eat_sends_it_home_inactive() -> None:
-    """An eaten ghost teleports home and cannot touch anyone."""
+def test_ghost_eat_does_not_teleport() -> None:
+    """An eaten ghost stays where it fell; the eyes walk home."""
     g = make_ghost((1, 1))
     g.reset((3, 1))
     g.frighten(8.0)
     g.eat(5.0)
-    assert g.tile == (1, 1)
-    assert g.target is None
+    assert g.tile == (3, 1)
     assert g.state is GhostState.EATEN
     assert not g.is_active
     assert not g.is_edible
+
+
+def test_ghost_revives_on_arriving_home() -> None:
+    """Reaching home ends EATEN long before the respawn timer."""
+    g = make_ghost((1, 1))
+    g.reset((3, 1))
+    g.eat(60.0)
+    g.advance(1.0, CORRIDOR, always(Direction.LEFT))
+    assert g.tile == (1, 1)
+    assert g.state is GhostState.EATEN      # tick() does the revival
+    g.tick(0.016)
+    assert g.state is GhostState.NORMAL
+    assert g.is_active
 
 
 def test_ghost_respawns_after_the_delay() -> None:
