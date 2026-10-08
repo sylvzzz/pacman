@@ -98,6 +98,29 @@ def test_add_rejects_an_empty_name_or_bad_score(
     assert table.entries == []
 
 
+def test_returning_player_keeps_only_their_best(
+        table: HighscoreTable) -> None:
+    """A worse run is refused; a better one replaces the old row."""
+    assert table.add("ana", 100)
+    assert not table.add("ana", 50)
+    assert table.entries == [HighscoreEntry("ana", 100)]
+    assert table.add("ana", 150)
+    assert table.entries == [HighscoreEntry("ana", 150)]
+
+
+def test_load_collapses_duplicate_names(table: HighscoreTable) -> None:
+    """A legacy file with repeats keeps each name's highest score."""
+    table.path.write_text(json.dumps([
+        {"name": "gab", "score": 40},
+        {"name": "gab", "score": 90},
+        {"name": "gab", "score": 0},
+        {"name": "cy", "score": 10},
+    ]))
+    table.load()
+    assert table.entries == [HighscoreEntry("gab", 90),
+                             HighscoreEntry("cy", 10)]
+
+
 def test_save_and_load_round_trip(table: HighscoreTable) -> None:
     """What is saved is what comes back."""
     table.add("ana", 120)

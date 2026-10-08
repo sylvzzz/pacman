@@ -5,8 +5,9 @@ Contents: HighscoreEntry, sanitize_name(), is_valid_name(),
   is_valid_score(), HighscoreTable.
 
 The file is a JSON list of ``{"name": str, "score": int}`` objects, best
-first.  Loading never fails the game: a missing, unreadable or corrupt
-file is an empty table, and bad rows inside a good file are skipped.
+first, one row per name — a player's best run only.  Loading never fails
+the game: a missing, unreadable or corrupt file is an empty table, and bad
+rows inside a good file are skipped.
 Saving writes a temporary file next to the target and renames it over
 the old one, so a crash mid-write cannot leave half a table behind.
 """
@@ -93,9 +94,21 @@ class HighscoreTable:
         self._trim()
 
     def _trim(self) -> None:
-        """Sort best first (stable, so ties keep age order); keep ten."""
+        """Sort best first, one row per name (its best), then keep ten.
+
+        The sort is stable, so ties keep age order.  Duplicates already
+        in the file collapse to each name's highest score here, which
+        is why loading a legacy file with repeats repairs itself on the
+        next save.
+        """
         self.entries.sort(key=lambda entry: entry.score, reverse=True)
-        del self.entries[MAX_ENTRIES:]
+        kept: list[HighscoreEntry] = []
+        seen: set[str] = set()
+        for entry in self.entries:
+            if entry.name not in seen:
+                seen.add(entry.name)
+                kept.append(entry)
+        self.entries = kept[:MAX_ENTRIES]
 
     def qualifies(self, score: int) -> bool:
         """Return True when *score* would make it into the table."""
@@ -105,7 +118,10 @@ class HighscoreTable:
                 or score > self.entries[-1].score)
 
     def add(self, name: str, score: int) -> bool:
-        """Insert a score and trim the table to ten.
+        """Record a run for *name* and trim the table to ten.
+
+        A name holds at most one row: its best run.  A returning player
+        only replaces that row when the new score beats it.
 
         Args:
             name: the player; sanitised first.  An empty result is
@@ -113,10 +129,14 @@ class HighscoreTable:
             score: points to record.
 
         Returns:
-            True when the score is now in the table.
+            True when the score is now the player's row in the table.
         """
         clean = sanitize_name(name)
         if not clean or not is_valid_score(score):
+            return False
+        best = max((e.score for e in self.entries if e.name == clean),
+                   default=-1)
+        if score <= best:
             return False
         if not self.qualifies(score):
             return False

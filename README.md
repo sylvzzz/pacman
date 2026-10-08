@@ -123,7 +123,9 @@ Keys, with the defaults from `config.json`:
 ## Highscore
 
 Scores are kept in the JSON file named by `highscore_filename`, as the top
-ten entries only. A name is at most 10 characters and may contain letters,
+ten entries only. Each name holds a single row — its best run — so a
+returning player replaces that row only when the new score beats it. A name
+is at most 10 characters and may contain letters,
 digits and spaces; a score is a non-negative integer. Anything else in the
 file is rejected rather than trusted.
 
