@@ -143,7 +143,7 @@ class Screen:
         self.current_level = 0
         self.cheat_options = ["MORE LIVES", "INVINCIBILITY", "2x SPEED",
                               "FREEZE GHOSTS", "SCARE GHOSTS",
-                              "SKIP LEVEL", "+30S"]
+                              "SKIP LEVEL", "+30s"]
         self.levels = config.levels
         self.seed = config.seed
         self.mw, self.mh = (self.levels[self.current_level].width,
@@ -1037,7 +1037,7 @@ class Screen:
         if self.game is None:
             return
         text = {Phase.READY: "READY!",
-                Phase.LEVEL_WON: "LEVEL CLEARED"}.get(self.game.phase)
+                Phase.LEVEL_WON: "LEVEL COMPLETED"}.get(self.game.phase)
         color = self.colors["yellow"]
         if self.death_left > 0:
             text, color = "OUCH!", self.colors["red"]
@@ -1125,7 +1125,7 @@ class Screen:
             "FREEZE GHOSTS": game.toggle_freeze_ghosts,
             "SCARE GHOSTS": game.frighten_ghosts,
             "SKIP LEVEL": game.skip_level,
-            "+30S": game.add_time,
+            "+30s": game.add_time,
         }
         actions[name]()
         return index
@@ -1182,7 +1182,7 @@ class Screen:
             self.write_char("$", screen, size,
                             self.width // 2 - glyph_width // 2,
                             top - size * 9, self.colors["yellow"])
-            self.draw_line(screen, "CONGRATULATIONS - YOU WON!", top + 30,
+            self.draw_line(screen, "CONGRATULATIONS - YOU WON!", top + 50,
                            size, None, palette=list(self.colors.values()))
         else:
             self.draw_line(screen, "GAME OVER", top + 30, size,

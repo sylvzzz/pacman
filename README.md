@@ -1,29 +1,25 @@
-*This project has been created as part of the 42 curriculum by dbotelho, dbaltaza.*
-
-# Pac-Man
-
-Rebuilding the Pac-Man game in Python, on procedurally generated mazes.
-
-### Game (so far)
-![Game](img/demo.png)
-
-### Menu (so far)
-![Menu](img/menu.png)
-
-### Cheats (so far)
-![Cheats](img/cheat.png)
+*This project has been created as part of the 42 curriculum by <a href ="https://github.com/sylvzzz">dbotelho</a> and <a href ="https://github.com/dbaltaza">dbaltaza</a>*
 
 ## Description
 
-A Pac-Man clone written in Python 3.10+ with pygame-ce. Every level is a
+A *Pac-Man* clone written in Python 3.10+ with pygame-ce. Every level is a
 freshly generated maze rather than the arcade original's fixed board: the
 assigned `mazegenerator` package produces the layout, and the game places
 the player, the four ghosts, the pacgums and the super-pacgums into it.
 
 Eat every pacgum to clear a level. A super-pacgum frightens the ghosts for
 a few seconds and makes them edible for points. Losing all your lives, or
-running out of time on a level, ends the run — and a good enough score goes
+running out of time on a level, ends the run and a good enough score goes
 into the highscore table.
+
+### Game
+![Game](img/demo.png)
+
+### Menu
+![Menu](img/menu.png)
+
+### Cheats
+![Cheats](img/cheat.png)
 
 ## Instructions
 
@@ -60,7 +56,7 @@ only the cheat itself (G) has an effect.
 | --- | --- |
 | L | one extra life |
 | I | invincible: ghosts cannot hurt you |
-| S | faster player (1.8x) |
+| S | faster player (2x) |
 | F | freeze the ghosts |
 | G | frighten every ghost, as a super-pacgum does |
 | N | skip to the next level |
@@ -79,8 +75,7 @@ faster each level, up to 40% faster than the configured speed.
 ## Resources
 
 - [pygame-ce documentation](https://pyga.me/docs/)
-- The assigned `mazegenerator` 2.1.0 package, used unmodified from `vendor/`.
-- The 42 subject, `subject.md`.
+- The assigned `mazegenerator` 2.1.0 package.
 
 <!-- TODO (both): how AI was used and for what. This section is explicitly
      required by the subject, and a vague answer is worse than none. Be
@@ -162,8 +157,7 @@ closed "42" glyph cells.
 
 - Python 3.10+ and pygame-ce.
 - Only pygame calls with an MLX equivalent are used. No `pygame.draw`, no
-  `pygame.font`, no `transform`, no `mixer`: all drawing goes through a
-  pixel buffer, and text is rasterised from a 5x7 block font.
+  `pygame.font`, no `transform`, no `mixer`.
 - Every function carries type hints and a PEP 257 docstring. `make lint`
   runs flake8 (79 columns) and mypy; `make lint-strict` runs `mypy --strict`.
 - `make test` runs the pytest suite. `pacman.core` is tested headlessly,

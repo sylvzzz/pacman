@@ -16,8 +16,8 @@
     "ghost_speed": 4.5,
     "pacgum_density": 80,
     "cheats_enabled": true,
-    "window_width": 780,
-    "window_height": 780,
+    "window_width": 1080,
+    "window_height": 1080,
     "fps": 120,
     # Maze size of each level in cells (width x height). At least 10 levels.
     "levels": [

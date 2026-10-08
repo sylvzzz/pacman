@@ -10,9 +10,8 @@ Arrow Left - Go back
 Arrows or WASD - Movement
 C - Open / close the cheat menu
 L - +1 life    I - invincible    S - 2x speed
-F - freeze ghosts    G - scare gho
-sts
-N - skip level    T - +30 secondsq
+F - freeze ghosts    G - scare ghosts
+N - skip level    T - +30 seconds
 R - Restart run
 ESC - Pause menu (Resume / Main menu)
 Q - Quit
