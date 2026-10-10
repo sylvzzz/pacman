@@ -12,6 +12,7 @@ SKIP_DIRS = {
 
 
 def py_files() -> Iterator[str]:
+    """Yield every Python file path in the repo, skipping build dirs."""
     for root, dirs, files in os.walk("."):
         dirs[:] = [d for d in sorted(dirs) if d not in SKIP_DIRS]
         for name in sorted(files):
@@ -20,6 +21,11 @@ def py_files() -> Iterator[str]:
 
 
 def changed_files(base_ref: str) -> List[str]:
+    """Return the ``.py`` files changed against ``base_ref``.
+
+    Args:
+        base_ref: a branch name (PR events) or a commit SHA (push events).
+    """
     # PR events pass a branch name; push events pass a commit SHA.
     ref = f"origin/{base_ref}"
     if os.system(f"git rev-parse --verify --quiet {ref} > /dev/null"):
@@ -29,6 +35,11 @@ def changed_files(base_ref: str) -> List[str]:
 
 
 def write_context(base_ref: str) -> bool:
+    """Write the repo context file for ``base_ref``.
+
+    Returns:
+        True when the file was written, False when nothing changed.
+    """
     changed = changed_files(base_ref)
     if not changed:
         return False
@@ -57,6 +68,7 @@ def write_context(base_ref: str) -> bool:
 
 
 def main() -> None:
+    """Build the context file for the base ref given in the environment."""
     base_ref = os.environ["BASE_REF"]
     if write_context(base_ref):
         print("context.txt written")

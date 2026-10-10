@@ -155,6 +155,7 @@ def test_mover_asks_only_at_tile_centres() -> None:
     calls: list[int] = []
 
     def pick() -> Direction:
+        """Record the call and always choose RIGHT."""
         calls.append(1)
         return Direction.RIGHT
 
@@ -169,6 +170,7 @@ def test_mover_asks_once_per_tile_crossed() -> None:
     calls: list[int] = []
 
     def pick() -> Direction:
+        """Record the call and always choose RIGHT."""
         calls.append(1)
         return Direction.RIGHT
 

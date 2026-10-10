@@ -33,13 +33,6 @@ lint:
 	$(PY) -m flake8 .
 	$(PY) -m mypy . $(MYPY_FLAGS)
 
-lint-strict:
-	$(PY) -m flake8 .
-	$(PY) -m mypy . --strict
-
-test:
-	$(PY) -m pytest -q
-
 package:
 	$(PY) -m pip install pyinstaller
 	$(PY) -m PyInstaller --noconfirm pac-man.spec

@@ -15,17 +15,20 @@ MODEL = "moonshotai/kimi-k3"
 
 
 def system_prompt() -> str:
+    """Return the reviewer system prompt, read from ``review_prompt.txt``."""
     here = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(here, "review_prompt.txt"), encoding="utf-8") as f:
         return f.read()
 
 
 def read_diff() -> str:
+    """Return the diff written to ``diff.txt`` by the workflow."""
     with open("diff.txt", "r", encoding="utf-8") as f:
         return f.read()
 
 
 def read_context() -> str:
+    """Return the repo context file, or an empty string when it is absent."""
     try:
         with open("context.txt", "r", encoding="utf-8") as f:
             return f.read()
@@ -34,6 +37,16 @@ def read_context() -> str:
 
 
 def call_nvidia_api(diff_content: str, context: str = "") -> Dict[str, Any]:
+    """Ask the model to review a diff against the repo context.
+
+    Args:
+        diff_content: the unified diff to review.
+        context: current contents of the repo's Python files, used to check
+            cross-module contracts.
+
+    Returns:
+        The parsed review, with a summary, a severity and a list of comments.
+    """
     user_content = (
         f"Analyze this Pull Request diff and what it breaks when it ships. "
         f"The REPO CONTEXT below contains the CURRENT contents of every "
@@ -89,6 +102,7 @@ def call_nvidia_api(diff_content: str, context: str = "") -> Dict[str, Any]:
 
 
 def build_comment_body(review: Dict[str, Any]) -> str:
+    """Render a review dict as the Markdown body of a PR comment."""
     severity_emoji = {
         "none": "✅",
         "low": "🟢",
@@ -118,6 +132,7 @@ def build_comment_body(review: Dict[str, Any]) -> str:
 
 
 def post_comment(body: str) -> None:
+    """Post ``body`` as a comment on the pull request in the environment."""
     url = f"https://api.github.com/repos/{REPO}/issues/{PR_NUMBER}/comments"
     payload = json.dumps({"body": body}).encode("utf-8")
 
@@ -142,6 +157,7 @@ def post_comment(body: str) -> None:
 
 
 def main() -> None:
+    """Read the diff, ask the model and publish (or print) the review."""
     diff = read_diff()
 
     if not diff.strip():

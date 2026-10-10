@@ -85,7 +85,24 @@ WALL_MASKS = {code: Wall(code).wall for code in range(16)}
 
 
 class Screen:
+    """Draws game state onto a pygame surface.
+
+    The screen owns no game state. It reads a ``Game`` and paints it (maze,
+    pellets, entities, HUD, menus) while the scenes decide what to show.
+
+    Attributes:
+        config: the parsed configuration in use.
+        width: window width in pixels.
+        height: window height in pixels.
+    """
+
     def __init__(self, config: GameConfig) -> None:
+        """Set up the window size and the colouring tables.
+
+        Args:
+            config: parsed configuration, source of the window size and the
+                point values shown in the HUD.
+        """
         self.config = config
         self.width = config.window_width
         self.height = config.window_height
@@ -211,6 +228,16 @@ class Screen:
 
     def write_char(self, char: str, screen: pygame.Surface, size: int,
                    x: int, y: int, color: Color = (255, 255, 0)) -> None:
+        """Draw one glyph at ``(x, y)`` as solid blocks.
+
+        Args:
+            char: character to draw; unknown glyphs render as a space.
+            screen: target surface.
+            size: side length in pixels of a single glyph pixel.
+            x: left edge in pixels.
+            y: top edge in pixels.
+            color: fill colour.
+        """
         block = self.chars.get(char, " ")
         for row, line in enumerate(block):
             for col, bit in enumerate(line):
@@ -223,9 +250,29 @@ class Screen:
                                         size, size))
 
     def text_width(self, text: str, size: int, tracking: int = 5) -> int:
+        """Return the pixel width of ``text`` drawn at ``size``.
+
+        Args:
+            text: string to measure.
+            size: glyph scale in pixels.
+            tracking: gap in pixels between consecutive glyphs.
+
+        Returns:
+            Width in pixels, including the gaps between glyphs.
+        """
         return len(text) * self.LETTER_W * size + (len(text) - 1) * tracking
 
     def text_height(self, texts: list[str], size: int) -> int:
+        """Return the pixel height of ``texts`` drawn at ``size``.
+
+        Args:
+            texts: lines to measure; the height covers the line spacing
+                between them added to one glyph height.
+            size: glyph scale in pixels.
+
+        Returns:
+            Height in pixels.
+        """
         return (len(texts) - 1) * self.LINE_SPACING + self.LETTER_H * size
 
     def write(self, text: str, screen: pygame.Surface, x: int, y: int,

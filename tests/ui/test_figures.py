@@ -182,6 +182,7 @@ def decor_and_panel_pixels(
 
     def ink(draw: typing.Callable[[pygame.Surface], object]
             ) -> set[tuple[int, int]]:
+        """Draw on a void surface and return the lit pixels as a set."""
         surface = pygame.Surface((screen_obj.width, screen_obj.height))
         surface.fill(screen_obj.colors["void"])
         draw(surface)
