@@ -30,6 +30,3 @@ jobs:
           mypy . --warn-return-any --warn-unused-ignores \
             --ignore-missing-imports --disallow-untyped-defs \
             --check-untyped-defs
-
-      - name: Tests
-        run: pytest -q

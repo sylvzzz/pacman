@@ -44,6 +44,6 @@ test:
 package:
 	$(PY) -m pip install pyinstaller
 	$(PY) -m PyInstaller --noconfirm pac-man.spec
-	cp config.json packaging/INSTRUCTIONS.txt dist/
+	cp highscores.json config.json packaging/INSTRUCTIONS.txt dist/
 
 .PHONY: install run debug clean lint lint-strict test package
