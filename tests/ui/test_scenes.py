@@ -16,7 +16,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 from pacman import core  # noqa: E402
 from pacman.core.entities import Direction  # noqa: E402
-from pacman.core.game import Phase  # noqa: E402
+from pacman.core.game import Game, Phase  # noqa: E402
 from pacman.ui.app import App  # noqa: E402
 from pacman.ui.scenes import (EndScene, HighscoresScene,  # noqa: E402
                               InstructionsScene, MenuScene, PlayScene)
@@ -31,6 +31,11 @@ def app(tmp_path: Path) -> App:
         core.load_config(str(REPO / "config.json")),
         highscore_filename=str(tmp_path / "scores.json"))
     return App(config)
+
+
+def wanted_of(game: Game) -> Direction | None:
+    """Return the buffered turn, read afresh so mypy keeps no narrowing."""
+    return game.player.wanted
 
 
 def press(app: App, *keys: str) -> None:
@@ -282,7 +287,7 @@ def test_wasd_steers_like_the_arrows(app: App) -> None:
     press(app, "a")
     assert game.player.wanted is Direction.LEFT
     press(app, "d")
-    assert game.player.wanted is Direction.RIGHT
+    assert wanted_of(game) is Direction.RIGHT
 
 
 def test_arrow_keys_steer_and_r_restarts(app: App) -> None:

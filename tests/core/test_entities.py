@@ -273,6 +273,11 @@ def test_player_reset_clears_input_and_keeps_lives() -> None:
 
 # ------------------------------------------------------------------- Ghost
 
+def state_of(ghost: Ghost) -> GhostState:
+    """Return *ghost*'s state, read afresh so mypy keeps no narrowing."""
+    return ghost.state
+
+
 def make_ghost(home: Point = (1, 1)) -> Ghost:
     """Return a NORMAL ghost on *home*."""
     return Ghost(home, 4.0, Personality.CHASER)
@@ -342,7 +347,7 @@ def test_ghost_revives_on_arriving_home() -> None:
     assert g.tile == (1, 1)
     assert g.state is GhostState.EATEN      # tick() does the revival
     g.tick(0.016)
-    assert g.state is GhostState.NORMAL
+    assert state_of(g) is GhostState.NORMAL
     assert g.is_active
 
 

@@ -39,6 +39,11 @@ def rig(config: GameConfig, rows: tuple[str, ...] = HALL_ROWS,
     return game
 
 
+def state_of(ghost: Ghost) -> GhostState:
+    """Return *ghost*'s state, read afresh so mypy keeps no narrowing."""
+    return ghost.state
+
+
 def run(game: Game, seconds: float, step: float = 0.016) -> None:
     """Call update repeatedly for about *seconds*."""
     for _ in range(round(seconds / step)):
@@ -238,7 +243,7 @@ def test_eaten_ghost_revives_after_the_respawn_delay(
     assert g.ghosts[0].state is GhostState.EATEN
     assert g.ghosts[0].tile != (9, 1)      # no teleport to the spawn
     run(g, small_config.ghost_respawn_time + 0.5)
-    assert g.ghosts[0].state is GhostState.NORMAL
+    assert state_of(g.ghosts[0]) is GhostState.NORMAL
     assert g.ghosts[0].is_active
 
 
@@ -256,7 +261,7 @@ def test_eaten_ghost_walks_home_and_revives_there(
     while g.ghosts[0].state is GhostState.EATEN and steps < 400:
         g.update(0.016)
         steps += 1
-    assert g.ghosts[0].state is GhostState.NORMAL
+    assert state_of(g.ghosts[0]) is GhostState.NORMAL
     assert g.ghosts[0].tile == (9, 1)
 
 
@@ -272,7 +277,7 @@ def test_eaten_ghost_revives_when_the_fright_window_ends(
     assert g.ghosts[0].state is GhostState.EATEN
     assert g.ghosts[0].tile != (1, 1)   # still walking home, not stuck
     run(g, small_config.ghost_respawn_time)
-    assert g.ghosts[0].state is GhostState.NORMAL
+    assert state_of(g.ghosts[0]) is GhostState.NORMAL
     assert g.ghosts[0].tile != (9, 1)
 
 
