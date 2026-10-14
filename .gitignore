@@ -26,3 +26,6 @@ vendor/
 players.json\
 notes.txt
 table.md
+# Build output
+build/
+dist/

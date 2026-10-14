@@ -4,6 +4,7 @@ PY = $(VENV)/bin/python
 CONFIG ?= config.json
 # The assigned A-Maze-ing package (used as-is). Drop the wheel in vendor/
 # or override:  make install MAZEGEN=/path/to/other-package
+MAZEGEN ?= vendor/mazegenerator-2.1.0-py3-none-any.whl
 
 # $(PY) pac-man.py $(CONFIG) --command for the finalized project
 
@@ -14,7 +15,7 @@ install:
 	$(PYTHON) -m venv $(VENV)
 	$(PY) -m pip install --upgrade pip
 	$(PY) -m pip install -r requirements.txt
-	$(PY) -m pip install mazegenerator-2.1.0-py3-none-any.whl
+	$(PY) -m pip install --force-reinstall $(MAZEGEN)
 
 run:
 	$(PY) pac-man.py config.json
@@ -33,9 +34,16 @@ lint:
 	$(PY) -m flake8 .
 	$(PY) -m mypy . $(MYPY_FLAGS)
 
+lint-strict:
+	$(PY) -m flake8 .
+	$(PY) -m mypy . --strict
+
+test:
+	$(PY) -m pytest -q
+
 package:
 	$(PY) -m pip install pyinstaller
 	$(PY) -m PyInstaller --noconfirm pac-man.spec
-	cp config.json packaging/INSTRUCTIONS.txt dist/pac-man/
+	cp config.json packaging/INSTRUCTIONS.txt dist/
 
 .PHONY: install run debug clean lint lint-strict test package
