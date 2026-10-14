@@ -38,12 +38,9 @@ lint-strict:
 	$(PY) -m flake8 .
 	$(PY) -m mypy . --strict
 
-test:
-	$(PY) -m pytest -q
-
 package:
 	$(PY) -m pip install pyinstaller
-	$(PY) -m PyInstaller --noconfirm pac-man.spec
-	cp highscores.json config.json packaging/INSTRUCTIONS.txt dist/
+	$(PY) -m PyInstaller --noconfirm --distpath pac-man pac-man.spec
+	cp highscores.json config.json packaging/INSTRUCTIONS.txt pac-man/
 
 .PHONY: install run debug clean lint lint-strict test package
