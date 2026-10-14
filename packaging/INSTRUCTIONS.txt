@@ -1,5 +1,58 @@
 PAC-MAN
 
-Run: ./pac-man config.json
+RUN
+  ./pac-man config.json
+  (config.json is optional: without it the built-in defaults are used.)
 
-Controls, options and configuration: TODO
+GOAL
+  Eat every pacgum in the maze to clear the level. Avoid the four
+  ghosts. A super-pacgum makes them edible for a few seconds. Clear all
+  levels, or lose all lives, and your score goes on the highscore table.
+
+CONTROLS
+  Arrow keys      steer Pac-Man (a turn pressed early is kept until
+                  the next junction)
+  Up / Down       move in menus
+  Enter           select
+  Esc             pause / back
+  R               restart the run
+  Q               quit to the menu
+
+CHEAT MODE (for evaluation)
+  C               open the cheat menu during a game
+  Up / Down       choose a cheat, Enter arms or disarms it (ON/OFF)
+  Once a cheat is ON, its letter triggers it from the game:
+    L  more lives          I  invincibility (toggle)
+    S  2x player speed     F  freeze ghosts (toggle)
+    G  scare ghosts        N  skip level
+    T  +30 seconds
+  Disabled when "cheats_enabled" is false in the config.
+
+CONFIGURATION (config.json)
+  JSON file; lines starting with # or // are comments. Every key is
+  optional: a missing key takes its default, an invalid value is
+  clamped with a warning, an unknown key is ignored.
+
+  lives                     starting lives
+  points_per_pacgum         score for a pacgum
+  points_per_super_pacgum   score for a super-pacgum
+  points_per_ghost          score for an eaten ghost
+  seed                      maze seed of the first level (>= 1)
+  level_max_time            seconds allowed per level
+  frightened_time           seconds ghosts stay edible
+  ghost_respawn_time        seconds before an eaten ghost returns
+  ready_time                "READY" pause before each level
+  player_speed, ghost_speed tiles per second
+  pacgum_density            percentage of corridors holding a pacgum
+  cheats_enabled            true / false
+  window_width, window_height, fps
+  highscore_filename        where scores are saved
+  levels                    list of {"width": w, "height": h} mazes
+                            (in cells), one per level
+
+HIGHSCORES
+  Saved to the file named by "highscore_filename". Names: up to 10
+  characters, letters, digits and spaces. The top 10 are kept.
+
+A malformed or unreadable config file stops the game with a message;
+the game never prints a traceback.
