@@ -557,3 +557,25 @@ def test_load_config_missing_file_raises() -> None:
     """load_config propagates the file errors from read_config_file."""
     with pytest.raises(ConfigError):
         load_config("this_file_does_not_exist.json")
+
+
+def test_load_config_warns_on_non_json_extension(
+    tmp_path: Path,
+    log_records: RecordingHandler,
+) -> None:
+    """A valid JSON file with another name loads, with one WARNING."""
+    path = tmp_path / "settings.txt"
+    path.write_text('{"lives": 5}', encoding="utf-8")
+    assert load_config(str(path)).lives == 5
+    assert any(".json" in m for m in log_records.warnings)
+
+
+def test_load_config_json_extension_is_silent(
+    tmp_path: Path,
+    log_records: RecordingHandler,
+) -> None:
+    """A .json file, in any letter case, produces no extension warning."""
+    path = tmp_path / "SETTINGS.JSON"
+    path.write_text('{"lives": 5}', encoding="utf-8")
+    load_config(str(path))
+    assert log_records.warnings == []

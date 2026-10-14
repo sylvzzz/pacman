@@ -429,6 +429,12 @@ def load_config(path: str) -> GameConfig:
     Raises:
         ConfigError: the file is unreadable or malformed.  Invalid
             *values* never reach here -- they are warned about and
-            repaired by build_config().
+            repaired by build_config().  A name that does not end in
+            ``.json`` only earns a WARNING: the subject says the
+            filename does not matter, so the content decides.
     """
-    return build_config(read_config_file(path))
+    raw = read_config_file(path)
+    if not path.lower().endswith(".json"):
+        get_logger().warning(
+            f"{path} does not end in .json; parsing it as JSON anyway")
+    return build_config(raw)
