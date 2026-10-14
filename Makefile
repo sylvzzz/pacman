@@ -4,7 +4,7 @@ PY = $(VENV)/bin/python
 CONFIG ?= config.json
 # The assigned A-Maze-ing package (used as-is). Drop the wheel in vendor/
 # or override:  make install MAZEGEN=/path/to/other-package
-MAZEGEN ?= vendor/mazegenerator-2.1.0-py3-none-any.whl
+MAZEGEN ?= mazegenerator-2.1.0-py3-none-any.whl
 
 # $(PY) pac-man.py $(CONFIG) --command for the finalized project
 
